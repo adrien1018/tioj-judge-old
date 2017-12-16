@@ -6,8 +6,7 @@ Basic structure: **Communicator - Controller - Graders**
 ## 4-stage grading
 
 1. Pre-execution
-   - **Validation (used when source code is restricted)**
-   - **Compilation**
+   - **Validation** (used when source code is restricted) **and compilation**
 2. Execution
    - **Run main program(s) in sandbox**
    - Usually produce output file(s)
