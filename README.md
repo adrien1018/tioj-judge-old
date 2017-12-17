@@ -8,7 +8,7 @@ Basic structure: **Communicator - Controller - Graders**
 1. Pre-execution
    - **Validation** (used when source code is restricted) **and compilation**
 2. Execution
-   - **Run main program(s) in sandbox**
+   - **Run main program(s)**
      - Produce output file(s) [in most cases but not necessary]
    - Collect running status of sandbox, e.g. running time, memory usage, verdict (normal, TLE, MLE, RE)
 3. Checking
@@ -21,6 +21,8 @@ Basic structure: **Communicator - Controller - Graders**
    - Arrange all running status & results into a single file
    - **Determine overall results of this submission**
 
+Steps marked in bold allow problem setters customization and should be run in the sandbox.
+
 ### Grader
 
 A grader process handles a part of submission grading only.
@@ -28,7 +30,7 @@ A grader process handles a part of submission grading only.
 The grading process is separated into:
 
 - Pre-execution stage
-- Execution & checking stage of each testdata
+- Execution & checking stage (combined) of each testdata
 - Scoring stage
 
 Graders are run without root permission. The permission required by the sandbox is obtained from setuid.
@@ -46,3 +48,16 @@ Control grading processes of queueing submissions
   - It should support incomplete grading (if the submission doesn't pass a testdata, the remaining testdata in the same subtask are not graded)
 - Create grading environment for graders (directories, sources, testdata, etc.)
 - Handle abnormal termination
+
+## Sandbox
+
+### Requirements
+
+- VSS / RSS / running time measurement & limit
+- Restricted system call
+  - Basic file operations (e.g. `open`, `close`, `lseek`) should be allowed optionally
+    - (but only in the current directory?)
+- Basic redirection / pipe operations
+  - Cross-bound stdin & stdout (CF-like interactive)
+- Run multiple commands (or just run sandbox several times?)
+- Output limit (?)
