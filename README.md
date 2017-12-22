@@ -3,14 +3,15 @@
 
 Basic structure: **Communicator - Controller - Graders**
 
-## 4-stage grading
+## 5-stage grading
 
 1. Pre-execution
    - **Validation** (used when source code is restricted) **and compilation**
+   - There can be different pre-execution commands in a problem (e.g., different programming languages)
 2. Execution
    - **Run main program(s)**
      - Produce output file(s) [in most cases but not necessary]
-   - Collect running status of sandbox, e.g. running time, memory usage, verdict (normal, TLE, MLE, RE)
+   - Collect running status of sandbox, e.g., running time, memory usage, verdict (normal, TLE, MLE, RE)
 3. Checking
    - If running status is not 'normal', skip this stage
    - **Arrange output and running status into one or more result fields**
@@ -20,8 +21,26 @@ Basic structure: **Communicator - Controller - Graders**
 4. Scoring
    - Arrange all running status & results into a single file
    - **Determine overall results of this submission**
+5. Post-scoring
+   - This stage is optional, used by *Codechef challenge*-like problems only
+   - Arrange overall results of all submissions into a single file
+   - **Adjust overall results of submissions**
 
 Steps marked in bold allow problem setters customization and should be run in the sandbox.
+
+### Competition Mode
+
+Used by problems involving interaction between submissions.
+
+1. Pre-execution stage
+   - Same as ordinary problems
+2. Competition stage
+   - **Problem setter writes a controller to hold the competition, and output results of all participating programs**
+   - A controller will require higher permission (e.g., `fork`, `exec`) to run submissions in the desired way
+     - Non-admin can't set this type of problems
+
+The whole competition is held again once a new program is submitted
+- Need stricter restrictions on submissions
 
 ### Grader
 
@@ -38,7 +57,10 @@ Graders are run without root permission. The permission required by the sandbox 
 ## Communicator & API
 
 ?
-(fetch new submissions, sync testdata and problem settings, return results)
+
+(fetch new submissions, sync testdata, problem settings and return results)
+
+(need adapter to be backward compatible)
 
 ## Controller
 
@@ -55,7 +77,7 @@ Control grading processes of queueing submissions
 
 - VSS / RSS / running time measurement & limit
 - Restricted system call
-  - Basic file operations (e.g. `open`, `close`, `lseek`) should be allowed optionally
+  - Basic file operations (e.g., `open`, `close`, `lseek`) should be allowed optionally
     - (but only in the current directory?)
 - Basic redirection / pipe operations
   - Cross-bound stdin & stdout (CF-like interactive)
