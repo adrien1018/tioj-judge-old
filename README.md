@@ -73,13 +73,4 @@ Control grading processes of queueing submissions
 
 ## Sandbox
 
-### Requirements
-
-- VSS / RSS / running time measurement & limit
-- Restricted system call
-  - Basic file operations (e.g., `open`, `close`, `lseek`) should be allowed optionally
-    - (but only in the current directory?)
-- Basic redirection / pipe operations
-  - Cross-bound stdin & stdout (CF-like interactive)
-- Run multiple commands (or just run sandbox several times?)
-- Output limit (?)
+[adrien1018/tstime](https://github.com/adrien1018/tstime)
