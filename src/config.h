@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <string>
 
-extern const std::unordered_map<std::string, int> SyscallNum;
-extern const std::string BoxPath;
+extern const std::unordered_map<std::string, int> kSyscallNum;
+extern const std::string kBoxPath;
 
 #endif

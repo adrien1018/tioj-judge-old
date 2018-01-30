@@ -16,10 +16,9 @@ if [[ $? -ne 4 ]]; then
     exit 1
 fi
 
-OPTIONS=p
 LONGOPTIONS=boxpath:
 
-PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTIONS --name "$0" -- "$@")
+PARSED=$(getopt --options='' --longoptions=$LONGOPTIONS --name "$0" -- "$@")
 if [[ $? -ne 0 ]]; then
     exit 2
 fi
@@ -46,4 +45,4 @@ done
 
 BOXPATH=${BOXPATH//\\/\\\\}
 BOXPATH=${BOXPATH//\"/\\\"}
-echo 'const std::string BoxPath = "'$BOXPATH'";' >> ./src/config.cpp
+echo 'const std::string kBoxPath = "'$BOXPATH'";' >> ./src/config.cpp
