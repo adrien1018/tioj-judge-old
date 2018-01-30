@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+g++ -Wall ./src/make_syscall_check.cpp -o ./src/syscall_check
+./src/syscall_check < ./src/syscall_list > ./src/gen_syscall.cpp
+g++ -Wall ./src/gen_syscall.cpp -o ./src/gen_syscall
+if [ $? != 0 ]; then
+        exit $?
+fi
+
+./src/gen_syscall > ./src/config.cpp
+rm -f ./src/gen_syscall ./src/syscall_check ./src/gen_syscall.cpp
+
+getopt --test > /dev/null
+if [[ $? -ne 4 ]]; then
+    echo "`getopt --test` failed"
+    exit 1
+fi
+
+OPTIONS=p
+LONGOPTIONS=boxpath:
+
+PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTIONS --name "$0" -- "$@")
+if [[ $? -ne 0 ]]; then
+    exit 2
+fi
+
+eval set -- "$PARSED"
+BOXPATH="/tmp/tioj-box/"
+
+while true; do
+	case "$1" in
+		--boxpath)
+			BOXPATH="$2"
+			shift 2
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			echo "Unexpected error"
+			exit 1
+			;;
+	esac
+done
+
+BOXPATH=${BOXPATH//\\/\\\\}
+BOXPATH=${BOXPATH//\"/\\\"}
+echo 'const std::string BoxPath = "'$BOXPATH'";' >> ./src/config.cpp
