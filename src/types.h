@@ -1,5 +1,11 @@
-#ifndef TYPES_H_INCLUDED
-#define TYPES_H_INCLUDED
+#ifndef TYPES_H_
+#define TYPES_H_
+
+#define _GNU_SOURCE
+
+#include <sched.h>
+#include <sys/types.h>
+#include <linux/taskstats.h>
 
 #include <string>
 #include <vector>
@@ -7,13 +13,16 @@
 struct Command {
   struct Mount {
     std::string path, mountpoint;
-    // read-only mount, mountpoint is relative to box
+    // read-only mount
+    // path is absolute, mountpoint is relative to box
     // useful when the task needs dynamic libs
   };
   struct Requirement {
     std::string file, file_in_box;
-    // files (usually exes, eg. python) to hardlink into the box
+    // files to hardlink into the box
+    // file is absolute, file_in_box is relative to box
   };
+  std::string box_dir;
   std::vector<std::string> command;
   std::vector<Mount> mounts;
   std::vector<Requirement> requirements;
@@ -22,16 +31,15 @@ struct Command {
   long long rss_limit;      // bytes
   long long vss_limit;      // bytes
   long long filesize_limit; // bytes
-  int uid;
+  uid_t uid;
+  cpu_set_t mask;
 };
 
 struct Task {
   struct OpenFile {
     std::string filename;
     size_t proc;
-    int fd, mode; // fd < 0: not open
-    bool in_box;  // whether the file is visible inside the box
-    std::string filename_in_box;
+    int fd, mode;
   };
   struct Pipe {
     size_t read_proc, write_proc;
@@ -42,5 +50,7 @@ struct Task {
   std::vector<Pipe> pipes;
   int process_limit;
 };
+
+typedef std::vector<struct taskstats> RunResult;
 
 #endif

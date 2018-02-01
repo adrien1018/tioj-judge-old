@@ -44,15 +44,13 @@ The whole competition is held again once a new program is submitted
 
 ### Grader
 
-A grader process handles a part of submission grading only.
+A grader process handles a part of submission grading only. It will setup everything inside directories of its task (dynamic libs, files, fds, pipes) and call the sandbox to execute program(s). 
 
 The grading process is separated into:
 
 - Pre-execution stage
-- Execution & checking stage (combined) of each testdata
+- Execution & checking stage (separated) of each testdata
 - Scoring stage
-
-Graders are run without root permission. The permission required by the sandbox is obtained from setuid.
 
 ## Communicator & API
 
@@ -65,12 +63,8 @@ Graders are run without root permission. The permission required by the sandbox 
 ## Controller
 
 Control grading processes of queueing submissions
-- Manage CPU threads
+- Manage CPU threads and box dirs
 - Determine which testdata to run
   - It should support incomplete grading (if the submission doesn't pass a testdata, the remaining testdata in the same subtask are not graded)
-- Create grading environment for graders (directories, sources, testdata, etc.)
 - Handle abnormal termination
 
-## Sandbox
-
-[adrien1018/tstime](https://github.com/adrien1018/tstime)

@@ -1,5 +1,5 @@
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef UTILS_H_
+#define UTILS_H_
 
 #include <errno.h>
 #include <unistd.h>
@@ -23,6 +23,9 @@ int IsDirectory(const std::string& path);
 int IsRegularFile(const std::string& path);
 bool IsAbsolutePath(const std::string& path);
 bool IsDownwardPath(const std::string& path);
-int mkdir_recursive(const std::string& path, mode_t mode);
+std::string ConcatPath(const std::string& path1, const std::string& path2);
+
+int mkdir_recursive(const char* path, mode_t mode);
+int rmdir_recursive(const char* path);
 
 #endif
