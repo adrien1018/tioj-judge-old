@@ -1,15 +1,5 @@
 #!/usr/bin/env bash
 
-g++ -Wall ./src/make_syscall_check.cpp -o ./src/syscall_check
-./src/syscall_check < ./src/syscall_list > ./src/gen_syscall.cpp
-g++ -Wall ./src/gen_syscall.cpp -o ./src/gen_syscall
-if [ $? != 0 ]; then
-        exit $?
-fi
-
-./src/gen_syscall > ./src/config.cpp
-rm -f ./src/gen_syscall ./src/syscall_check ./src/gen_syscall.cpp
-
 getopt --test > /dev/null
 if [[ $? -ne 4 ]]; then
     echo "`getopt --test` failed"
@@ -45,4 +35,5 @@ done
 
 BOXPATH=${BOXPATH//\\/\\\\}
 BOXPATH=${BOXPATH//\"/\\\"}
+echo '#include "config.h"' > ./src/config.cpp
 echo 'const std::string kBoxPath = "'$BOXPATH'";' >> ./src/config.cpp
