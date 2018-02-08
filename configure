@@ -6,7 +6,7 @@ if [[ $? -ne 4 ]]; then
     exit 1
 fi
 
-LONGOPTIONS=boxpath:
+LONGOPTIONS=boxpath:datapath:
 
 PARSED=$(getopt --options='' --longoptions=$LONGOPTIONS --name "$0" -- "$@")
 if [[ $? -ne 0 ]]; then

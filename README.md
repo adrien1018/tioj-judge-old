@@ -71,7 +71,7 @@ Control grading processes of queueing submissions
 
 ```
 |- kBoxPath 
-||- (submission_dir) (for each submission)
+||- (submission_dir) (for each running submission)
 |||- user/ (submission code file(s))
 |||- attachments/ (all files provided by problem setters)
 |||- temp/ (temporary files if needed)

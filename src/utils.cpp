@@ -1,5 +1,14 @@
 #include "utils.h"
 
+#include <ftw.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+
+#include <fstream>
+#include <algorithm>
+
 int IsDirectory(const std::string& path) {
   struct stat path_stat;
   IFERR(stat(path.c_str(), &path_stat))

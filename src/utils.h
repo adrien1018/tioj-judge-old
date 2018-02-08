@@ -1,20 +1,11 @@
 #ifndef UTILS_H_
 #define UTILS_H_
 
-#include <ftw.h>
 #include <errno.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <sys/types.h>
-
-#include <cstdio>
-#include <cstring>
+#include <stdio.h>
+#include <string.h>
 
 #include <string>
-#include <vector>
-#include <fstream>
-#include <algorithm>
 
 #include "types.h"
 

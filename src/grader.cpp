@@ -1,9 +1,10 @@
 #include "grader.h"
-#include "utils.h"
 
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mount.h>
+
+#include "utils.h"
 
 // bind mount path to mountpoint (readonly)
 int BindMountReadOnly(const std::string& path, const std::string& mountpoint) {
@@ -83,7 +84,7 @@ RunResult RunGrader(const ParTask& task) {
   SetupEnvironment(task/*, params */);
 
   RunResult result(task.programs.size());
-  // TODO: call sandbox, collect results, copy files out
+  // TODO: call sandbox, collect results
 
   ClearEnvironment(task);
   return result;

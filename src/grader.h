@@ -3,6 +3,6 @@
 
 #include "types.h"
 
-RunResult RunGrader(const Task& task);
+RunResult RunGrader(const ParTask& task);
 
 #endif
