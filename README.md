@@ -12,12 +12,11 @@ Basic structure: **Communicator - Controller - Graders**
    - **Run main program(s)**
      - Produce output file(s) [in most cases but not necessary]
    - Collect running status of sandbox, e.g., running time, memory usage, verdict (normal, TLE, MLE, RE)
-3. Checking
-   - If running status is not 'normal', skip this stage
+3. Evaluation
    - **Arrange output and running status into one or more result fields**
      - 0/1 (WA/AC) in most cases, but additional information may be given here
      - These fields will be sent to the web server
-   - (Execution and checking stage are run once per required testdata)
+   - (Execution and evaluation stage are run once per required testdata)
 4. Scoring
    - Arrange all running status & results into a single file
    - **Determine overall results of this submission**
@@ -36,7 +35,7 @@ Used by problems involving interaction between submissions.
    - Same as ordinary problems
 2. Competition stage
    - **Problem setter writes a controller to hold the competition, and output results of all participating programs**
-   - A controller will require higher permission (e.g., `fork`, `exec`) to run submissions in the desired way
+   - A controller will require higher permission (e.g., `fork`) to run submissions in the desired way
      - Non-admin can't set this type of problems
 
 The whole competition is held again once a new program is submitted
@@ -68,3 +67,48 @@ Control grading processes of queueing submissions
   - It should support incomplete grading (if the submission doesn't pass a testdata, the remaining testdata in the same subtask are not graded)
 - Handle abnormal termination
 
+### Directory Structure
+
+```
+|- kBoxPath 
+||- (submission_dir) (for each submission)
+|||- user/ (submission code file(s))
+|||- attachments/ (all files provided by problem setters)
+|||- temp/ (temporary files if needed)
+|||- pre_exec/
+||||- 00/ (sandbox for 1st program)
+||||- ...
+|||- testdata000/
+||||- exec/
+|||||- 00/
+|||||- ...
+||||- eval/
+|||||- 00/
+|||||- ...
+|||- ...
+|||- score/
+||||- 00/
+||||- ...
+|||- post_score/
+||||- 00/
+||||- ...
+
+|- kDataPath
+||- 1001/ (normal problem)
+|||- metafile
+|||- attachments/
+|||- testdata/
+|||- results/ (results of every submission)
+||- ...
+||- 3001/ (competition problem)
+|||- metafile
+|||- attachments/
+|||- submissions/
+||||- metafile (list results)
+||||- 123456/
+|||||- metafile (language)
+|||||- code
+|||||- ...
+||||- ...
+||- ...
+```

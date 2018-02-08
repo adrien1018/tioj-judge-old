@@ -15,11 +15,16 @@ fi
 
 eval set -- "$PARSED"
 BOXPATH="/tmp/tioj-box/"
+DATAPATH="/var/lib/tioj-judge/"
 
 while true; do
 	case "$1" in
 		--boxpath)
 			BOXPATH="$2"
+			shift 2
+			;;
+		--datapath)
+			DATAPATH="$2"
 			shift 2
 			;;
 		--)
@@ -35,5 +40,8 @@ done
 
 BOXPATH=${BOXPATH//\\/\\\\}
 BOXPATH=${BOXPATH//\"/\\\"}
-echo '#include "config.h"' > ./src/config.cpp
+DATAPATH=${DATAPATH//\\/\\\\}
+DATAPATH=${DATAPATH//\"/\\\"}
+echo -e '#include "config.h"\n' > ./src/config.cpp
 echo 'const std::string kBoxPath = "'$BOXPATH'";' >> ./src/config.cpp
+echo 'const std::string kDataPath = "'$DATAPATH'";' >> ./src/config.cpp

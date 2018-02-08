@@ -16,30 +16,49 @@ int BindMountReadOnly(const std::string& path, const std::string& mountpoint) {
   return 0;
 }
 
-// mount directories / hardlink files
-int SetupBox(const Command& cmd) {
+// helper function: get full path of PathPair.path_box
+inline std::string FullBoxPath(const Program& prog,
+                               const Environment::PathPair& path) {
+  return ConcatPath(prog.box_dir, path.path_box);
+}
+
+// mount directories / copy files
+int SetupBox(const Program& cmd) {
   IFERR(mkdir_recursive(cmd.box_dir.c_str(), 0666))
     return -1;
-  for (const Command::Mount& mnt : cmd.mounts) {
-    IFERR(BindMountReadOnly(mnt.path.c_str(),
-                            ConcatPath(cmd.box_dir, mnt.mountpoint).c_str())) {
+  for (const Environment::PathPair& mnt : cmd.env.mounts) {
+    IFERR(BindMountReadOnly(mnt.path_org.c_str(),
+                            FullBoxPath(cmd, mnt).c_str())) {
       return -1;
     }
   }
-  for (const Command::Requirement& req : cmd.requirements) {
-    IFERR(link(req.file.c_str(),
-               ConcatPath(cmd.box_dir, req.file_in_box).c_str())) {
-      return -1;
+  for (const Environment::Requirement& req : cmd.env.requirements) {
+    if (req.hardlink) {
+      IFERR(link(req.file.path_org.c_str(),
+                 FullBoxPath(cmd, req.file).c_str())) {
+        return -1;
+      }
+    }
+    else {
+      IFERR(CopyFile(req.file.path_org, FullBoxPath(cmd, req.file),
+                     req.permission)) {
+        return -1;
+      }
     }
   }
   return 0;
 }
 
-// umount and remove directories
-int ClearBox(const Command& cmd) {
-  for (const Command::Mount& mnt : cmd.mounts) {
-    IFERR(umount(ConcatPath(cmd.box_dir, mnt.mountpoint).c_str())) {
+// umount, move files and remove directories
+int ClearBox(const Program& cmd) {
+  for (const Environment::PathPair& mnt : cmd.env.mounts) {
+    IFERR(umount(FullBoxPath(cmd, mnt).c_str())) {
       return -1;
+    }
+  }
+  for (const Environment::PathPair& mv : cmd.env.results) {
+    IFERR(rename(FullBoxPath(cmd, mv).c_str(), mv.path_org.c_str())) {
+      if (errno != ENOENT) return -1;
     }
   }
   IFERR(rmdir_recursive(cmd.box_dir.c_str()))
@@ -47,21 +66,24 @@ int ClearBox(const Command& cmd) {
   return 0;
 }
 
-int SetupEnvironment(const Task& task/* , std::vector<struct cjail_para>& params */) {
-  for (const Command& cmd : task.commands) SetupBox(cmd);
+int SetupEnvironment(const ParTask& task/* , std::vector<struct cjail_para>& params */) {
+  for (const Program& prog : task.programs) SetupBox(prog);
   // TODO: setup pipes, open files, params
+  return 0;
 }
 
-int ClearEnvironment(const Task& task) {
-  for (const Command& cmd : task.commands) ClearBox(cmd);
+int ClearEnvironment(const ParTask& task) {
+  for (const Program& prog : task.programs) ClearBox(prog);
   // TODO: close files
+  return 0;
 }
 
-RunResult RunGrader(const Task& task) {
+// Run a taskset; all path_org should be absolute now (modified by controller)
+RunResult RunGrader(const ParTask& task) {
   SetupEnvironment(task/*, params */);
 
-  RunResult result(task.commands.size());
-  // TODO: call sandbox, collect results
+  RunResult result(task.programs.size());
+  // TODO: call sandbox, collect results, copy files out
 
   ClearEnvironment(task);
   return result;

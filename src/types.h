@@ -10,34 +10,66 @@
 #include <string>
 #include <vector>
 
-struct Command {
-  struct Mount {
-    std::string path, mountpoint;
-    // read-only mount
-    // path is absolute, mountpoint is relative to box
-    // useful when the task needs dynamic libs
+typedef std::vector<std::string> Arguments;
+
+struct ResLimit {
+  static const int kNoLim = -1;
+  long long time_limit;      // microseconds
+  long long rss_limit;       // bytes
+  long long vss_limit;       // bytes
+  long long stack_limit;     // bytes
+  long long filesize_limit;  // bytes
+  int process_limit;
+};
+
+const int ResLimit::kNoLim; // Constant indicates unlimited
+
+class LimAdj {
+public:
+  LimAdj(double f, long long c) : factor(f), constant(c) {}
+  double factor; long long constant;
+  template <class T> T operator()(T val) const {
+    if (val == ResLimit::kNoLim || factor < 0)
+      return ResLimit::kNoLim;
+    T result = static_cast<T>(factor * val) + constant;
+    return result < 0 ? 0 : result;
+  }
+};
+
+struct Environment {
+  struct PathPair {
+    std::string path_org, path_box;
+    // represents a pair of file/directory across the sandbox
+    // path_org is absolute or relative to submission dir
+    // path_box is relative to sandbox
   };
   struct Requirement {
-    std::string file, file_in_box;
-    // files to hardlink into the box
-    // file is absolute, file_in_box is relative to box
+    PathPair file;
+    bool hardlink;
+    mode_t permission;
   };
-  std::string box_dir;
-  std::vector<std::string> command;
-  std::vector<Mount> mounts;
-  std::vector<Requirement> requirements;
+  std::vector<PathPair> mounts;  // read-only bind mounts
+                                 // useful when the task needs dynamic libs
+  std::vector<Requirement> requirements; // files to hardlink/copy into the box
+  std::vector<PathPair> results;  // files to move out of the box when finished
   std::vector<int> syscall_whitelist;
-  long long time_limit;     // microseconds
-  long long rss_limit;      // bytes
-  long long vss_limit;      // bytes
-  long long filesize_limit; // bytes
+  mode_t box_permission;
+};
+
+struct Program {
+  Arguments command;
+  Environment env;
+
+  ResLimit limits;
+
+  std::string submission_dir, box_dir;
   uid_t uid;
   cpu_set_t mask;
 };
 
-struct Task {
+struct ParTask {
   struct OpenFile {
-    std::string filename;
+    std::string filename; // absolute or relative to submission dir
     size_t proc;
     int fd, mode;
   };
@@ -45,12 +77,76 @@ struct Task {
     size_t read_proc, write_proc;
     int read_fd, write_fd;
   };
-  std::vector<Command> commands;
+  std::vector<Program> programs;
   std::vector<OpenFile> files;
   std::vector<Pipe> pipes;
-  int process_limit;
 };
 
+typedef std::vector<ParTask> Task;
+
 typedef std::vector<struct taskstats> RunResult;
+typedef std::vector<std::vector<std::string>> StringTable;
+
+enum Verdict {
+  kAC = 0,  // Accepted
+  kWA,      // Wrong Answer
+  kTLE,     // Time Limit Exceeded
+  kMLE,     // Memory Limit Exceeded
+  kOLE,     // Output Limit Exceeded
+  kRE,      // Runtime Error (killed by signal)
+  kNE,      // Non-zero Exit status
+  kCE,      // Compilation Error
+  kJF       // Judgement Failed (internal error / timeout)
+};
+
+struct Problem { // This is what stored in problem metafile,
+                 //  not necessary to read completely when evaluating submissions
+  struct Attachment {
+    std::string filename;  // contains no path
+    mode_t perm;  //permission when copied into submission dir
+  };
+  struct LangSettings {
+    Task pre_exec_stage;
+    Task execution_stage;  // not used in competition mode
+    LimAdj time_adj, memory_adj;  // in case that different langs need different limits
+  };
+  struct Testdata {
+    ResLimit limits;
+    Arguments options;
+    std::vector<int> testdata_group;
+  };
+
+  int id;  // problem id
+  bool competition;
+  std::vector<Attachment> attachments;
+
+  // uid, mask, submission_dir, box_dir in Task struct are not filled
+  std::vector<LangSettings> langs;
+
+  // --- used in normal mode ---
+  std::vector<Testdata> testdata;
+  Task evaluation_stage;
+  Task scoring_stage;
+  Task post_scoring_stage;
+
+  // --- used in competition mode ---
+  Task competition_stage;
+};
+
+struct Submission {
+  int submission_id;
+  int problem_id;
+  size_t language;
+
+  static const int kAllTestdata = -1;
+  int testdata;  // testdata number; -1: all testdata
+  bool incomplete;  // incomplete grading
+
+  // TODO: progress & scheduling
+  int priority;  // judging priority
+  std::string submission_dir;
+};
+
+const int Submission::kAllTestdata;
 
 #endif
