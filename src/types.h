@@ -1,7 +1,11 @@
 #ifndef TYPES_H_
 #define TYPES_H_
 
+// This header defines types used in the judging process.
+
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <sched.h>
 #include <sys/types.h>
@@ -13,7 +17,7 @@
 typedef std::vector<std::string> Arguments;
 
 struct ResLimit {
-  static const int kNoLim = -1;
+  static const int kNoLim = -1;  // Constant indicating unlimited
   long long time_limit;      // microseconds
   long long rss_limit;       // bytes
   long long vss_limit;       // bytes
@@ -21,8 +25,6 @@ struct ResLimit {
   long long filesize_limit;  // bytes
   int process_limit;
 };
-
-const int ResLimit::kNoLim; // Constant indicates unlimited
 
 class LimAdj {
 public:
@@ -40,8 +42,13 @@ struct Environment {
   struct PathPair {
     std::string path_org, path_box;
     // represents a pair of file/directory across the sandbox
-    // path_org is absolute or relative to submission dir
-    // path_box is relative to sandbox
+    //  path_org is absolute or relative to submission dir
+    //  path_box is relative to sandbox
+    // probably contain some variables in settings
+    //  e.g. ${INPUT} ${OUTPUT} (path to input/output testdata file)
+    //       ${USERx} ${ASSETx} (path to the x-th file provided by user or problen setter)
+    //       ${GCC} ${PYTHON}   (path to some compiler / interpreter)
+    //  will be automatically converted to real path by controller
   };
   struct Requirement {
     PathPair file;
@@ -52,7 +59,7 @@ struct Environment {
                                  // useful when the task needs dynamic libs
   std::vector<Requirement> requirements; // files to hardlink/copy into the box
   std::vector<PathPair> results;  // files to move out of the box when finished
-  std::vector<int> syscall_whitelist;
+  std::vector<std::string> syscall_whitelist;
   mode_t box_permission;
 };
 
@@ -101,7 +108,7 @@ enum Verdict {
 
 struct Problem { // This is what stored in problem metafile,
                  //  not necessary to read completely when evaluating submissions
-  struct Attachment {
+  struct Asset {
     std::string filename;  // contains no path
     mode_t perm;  //permission when copied into submission dir
   };
@@ -118,19 +125,30 @@ struct Problem { // This is what stored in problem metafile,
 
   int id;  // problem id
   bool competition;
-  std::vector<Attachment> attachments;
+  std::vector<Asset> assets;
 
   // uid, mask, submission_dir, box_dir in Task struct are not filled
   std::vector<LangSettings> langs;
+
+  size_t overall_result_column_num;
 
   // --- used in normal mode ---
   std::vector<Testdata> testdata;
   Task evaluation_stage;
   Task scoring_stage;
   Task post_scoring_stage;
+  size_t testdata_result_column_num;
 
   // --- used in competition mode ---
   Task competition_stage;
+};
+
+enum Stage {
+  kPreExec = 0,
+  kExecution = 1,
+  kEvaluation = 2,
+  kScoring = 3,
+  kPostScoring = 4
 };
 
 struct Submission {
@@ -146,7 +164,5 @@ struct Submission {
   int priority;  // judging priority
   std::string submission_dir;
 };
-
-const int Submission::kAllTestdata;
 
 #endif

@@ -1,6 +1,8 @@
 #ifndef UTILS_H_
 #define UTILS_H_
 
+// This header defines some helper functions.
+
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>

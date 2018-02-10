@@ -45,6 +45,11 @@ std::string ConcatPath(const std::string& path1, const std::string& path2) {
 }
 
 int mkdir_recursive(const char* path, mode_t mode) {
+  if (!*path) {
+    errno = ENOENT;
+    return -1;
+  }
+
   size_t length = strlen(path);
   char* path_copy = (char*) malloc(length + 1);
   if (!path_copy) {
@@ -54,7 +59,7 @@ int mkdir_recursive(const char* path, mode_t mode) {
   strcpy(path_copy, path);
 
   char* ptr = path_copy;
-  for (; *ptr; ptr++) {
+  while (*++ptr) {
     if (*ptr == '/') {
       *ptr = '\0';
       IFERR(mkdir(path_copy, mode)) {
@@ -76,12 +81,13 @@ error:
   return -1;
 }
 
-int UnlinkHelper(const char* fpath, const struct stat* sb, int typeflag) {
+int UnlinkHelper(const char* fpath, const struct stat* sb, int typeflag,
+                 struct FTW *ftwbuf) {
   return remove(fpath);
 }
 
 int rmdir_recursive(const char* path) {
-  return ftw(path, UnlinkHelper, 128);
+  return nftw(path, UnlinkHelper, 128, FTW_DEPTH | FTW_PHYS);
 }
 
 int CopyFile(const std::string& source, const std::string& dest, mode_t perm) {
