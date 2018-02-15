@@ -131,54 +131,54 @@ std::vector<std::string> SplitLine(const std::string& a) {
 
 // read a comma-separated csv file
 StringTable ReadCsv(const std::string& filename) {
-	std::fstream fin(filename, std::ios::in);
-	if (!fin) return StringTable();
+  std::fstream fin(filename, std::ios::in);
+  if (!fin) return StringTable();
 
-	std::string str, now;
-	StringTable res;
-	bool flag = false;
-	while (getline(fin, str)) {
-		now += str;
-		flag ^= std::count(str.begin(), str.end(), '\"') & 1;
-		if (!flag) { // total '\"' character count is even - line completed
-			res.emplace_back(SplitLine(now));
-			now.clear();
-		}
-		else now += '\n';
-	}
-	return res;
+  std::string str, now;
+  StringTable res;
+  bool flag = false;
+  while (getline(fin, str)) {
+    now += str;
+    flag ^= std::count(str.begin(), str.end(), '\"') & 1;
+    if (!flag) { // total '\"' character count is even - line completed
+      res.emplace_back(SplitLine(now));
+      now.clear();
+    }
+    else now += '\n';
+  }
+  return res;
 }
 
 // combine columns into a single string
 std::string FormatLine(std::vector<std::string>::const_iterator first,
                        std::vector<std::string>::const_iterator last) {
-	std::string res, strtemp;
-	size_t pos;
-	for (; first != last; first++) {
-		if (first->find('\"') != std::string::npos ||
+  std::string res, strtemp;
+  size_t pos;
+  for (; first != last; first++) {
+    if (first->find('\"') != std::string::npos ||
         first->find(',') != std::string::npos ||
         first->find('\n') != std::string::npos) {
-			res += '\"';
-			strtemp = *first;
-			pos = 0;
-			while ((pos = strtemp.find('\"', pos)) != std::string::npos) {
-			  strtemp.insert(pos, 1, '\"');
-			  pos += 2;
-			}
-			res += strtemp;
-			res += '\"';
-		}
-		else res += *first;
-		res += ',';
-	}
-	res.pop_back();
-	return res;
+      res += '\"';
+      strtemp = *first;
+      pos = 0;
+      while ((pos = strtemp.find('\"', pos)) != std::string::npos) {
+        strtemp.insert(pos, 1, '\"');
+        pos += 2;
+      }
+      res += strtemp;
+      res += '\"';
+    }
+    else res += *first;
+    res += ',';
+  }
+  res.pop_back();
+  return res;
 }
 
 int WriteCsv(const StringTable& table, const std::string& filename)
 {
-	std::fstream fout(filename, std::ios::out | std::ios::binary);
-	if (!fout) return -1;
-	for (auto& i : table) fout << FormatLine(i.begin(), i.end()) << "\n";
-	return 0;
+  std::fstream fout(filename, std::ios::out | std::ios::binary);
+  if (!fout) return -1;
+  for (auto& i : table) fout << FormatLine(i.begin(), i.end()) << "\n";
+  return 0;
 }

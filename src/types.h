@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <linux/taskstats.h>
 
+#include <list>
 #include <string>
 #include <vector>
 
@@ -90,8 +91,10 @@ struct ParTask {
 };
 
 typedef std::vector<ParTask> Task;
+typedef std::vector<struct taskstats/*struct cjail_result*/> RunResult;
 
-typedef std::vector<struct taskstats> RunResult;
+// --- used by controller ---
+
 typedef std::vector<std::vector<std::string>> StringTable;
 
 enum Verdict {
@@ -148,7 +151,8 @@ enum Stage {
   kExecution = 1,
   kEvaluation = 2,
   kScoring = 3,
-  kPostScoring = 4
+  kPostScoring = 4,
+  kCompetition = -1
 };
 
 struct Submission {
@@ -160,9 +164,44 @@ struct Submission {
   int testdata;  // testdata number; -1: all testdata
   bool incomplete;  // incomplete grading
 
-  // TODO: progress & scheduling
-  int priority;  // judging priority
+  int priority;  // judging priority (0-255, default 127)
   std::string submission_dir;
+};
+
+struct Job {
+  Task tasks;
+  Stage stage;
+  int priority;  // scheduling priority, small is prior
+                 //  0-16777215, top 8 bits are judging priority
+};
+
+class JobGraph {
+private:
+  class JobGraphVertex {
+    friend class JobGraph;
+    Job job_;
+    std::vector<std::list<JobGraphVertex>::iterator> in_edges_, out_edges_;
+  public:
+    JobGraphVertex(const Job& j) : job_(j) {}
+  };
+  std::list<JobGraphVertex> vertices_;
+public:
+  typedef std::list<JobGraphVertex>::iterator VertexPtr;
+  JobGraph() {}
+
+  VertexPtr InsertVertex(const Job& job);
+  void AddEdge(VertexPtr from, VertexPtr to);
+  std::vector<VertexPtr> RemoveVertex(VertexPtr ptr);  // return those have no in edges
+
+  static const Job& GetJob(VertexPtr ptr);
+  size_t size() const;
+};
+
+class QueueingJob {
+public:
+  QueueingJob(JobGraph::VertexPtr j) : job(j) {}
+  JobGraph::VertexPtr job;
+  bool operator<(const QueueingJob& rhs) const;
 };
 
 #endif
