@@ -70,26 +70,26 @@ Control grading processes of queueing submissions
 ### Directory Structure
 
 ```
-|- kBoxPath 
-||- (submission_dir) (for each running submission)
-|||- user/ (submission code file(s))
-|||- attachments/ (all files provided by problem setters)
-|||- temp/ (temporary files if needed)
-|||- pre_exec/
+|- kBoxPath
+||- (${SUBDIR}) (for each running submission)
+|||- user/ (submission code file(s), ${USRDIR})
+|||- assets/ (all files provided by problem setters, ${ASDIR})
+|||- temp/ (temporary files if needed, ${TMPDIR})
+|||- pre_exec/ (${STAGEDIR})
 ||||- 00/ (sandbox for 1st program)
 ||||- ...
-|||- testdata000/
-||||- exec/
+|||- testdata000/ (${TDDIR})
+||||- exec/ (${STAGEDIR})
 |||||- 00/
 |||||- ...
-||||- eval/
+||||- eval/ (${STAGEDIR})
 |||||- 00/
 |||||- ...
 |||- ...
-|||- score/
+|||- score/ (${STAGEDIR})
 ||||- 00/
 ||||- ...
-|||- post_score/
+|||- post_score/ (${STAGEDIR})
 ||||- 00/
 ||||- ...
 
@@ -98,6 +98,9 @@ Control grading processes of queueing submissions
 |||- metafile
 |||- attachments/
 |||- testdata/
+||||- 000.in (${INPUT})
+||||- 000.out (${OUTPUT})
+||||- ...
 |||- results/ (results of every submission)
 ||- ...
 ||- 3001/ (competition problem)

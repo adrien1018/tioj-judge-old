@@ -36,11 +36,14 @@ bool IsDownwardPath(const std::string& path) {
       ));
 }
 
-// concatenate path1/path2; if path2 is absolute then return path2
+// concatenate path1/path2
 std::string ConcatPath(const std::string& path1, const std::string& path2) {
   if (path2.empty()) return path1;
-  if (path1.empty() || IsAbsolutePath(path2)) return path2;
-  if (path1.back() == '/') return path1 + path2;
+  if (path1.empty()) return path2;
+  if (path1.back() == '/' && path2.front() == '/')
+    return path1 + path2.substr(1);
+  if (path1.back() == '/' || path2.front() == '/')
+    return path1 + path2;
   return path1 + '/' + path2;
 }
 

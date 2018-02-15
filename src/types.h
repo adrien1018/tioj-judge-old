@@ -31,25 +31,25 @@ class LimAdj {
 public:
   LimAdj(double f, long long c) : factor(f), constant(c) {}
   double factor; long long constant;
-  template <class T> T operator()(T val) const {
-    if (val == ResLimit::kNoLim || factor < 0)
-      return ResLimit::kNoLim;
-    T result = static_cast<T>(factor * val) + constant;
-    return result < 0 ? 0 : result;
-  }
+  template <class T> T operator()(T val) const;
 };
 
 struct Environment {
   struct PathPair {
     std::string path_org, path_box;
     // represents a pair of file/directory across the sandbox
-    //  path_org is absolute or relative to submission dir
-    //  path_box is relative to sandbox
+    //  path_org is absolute
+    //  path_box is relative to sandbox or blank (= same as path_org)
     // probably contain some variables in settings
     //  e.g. ${INPUT} ${OUTPUT} (path to input/output testdata file)
-    //       ${USERx} ${ASSETx} (path to the x-th file provided by user or problen setter)
-    //       ${GCC} ${PYTHON}   (path to some compiler / interpreter)
+    //       ${SUBDIR}          (path to the submission dir)
+    //       ${USER_x}          (NAME of the x-th file provided by user)
+    //       ${stage_x}         (NAME of the x-th asset for a certain stage)
+    //       ${gcc} ${python3}  (path to some compiler / interpreter)
+    //       ${METAFILE}        (name of metafile
+    //                           (contains information about submission, inside sandbox))
     //  will be automatically converted to real path by controller
+    //  thus character '$' need to be escaped if needed
   };
   struct Requirement {
     PathPair file;
@@ -58,14 +58,19 @@ struct Environment {
   };
   std::vector<PathPair> mounts;  // read-only bind mounts
                                  // useful when the task needs dynamic libs
-  std::vector<Requirement> requirements; // files to hardlink/copy into the box
+  std::vector<Requirement> requirements;  // files to hardlink/copy into the box
   std::vector<PathPair> results;  // files to move out of the box when finished
   std::vector<std::string> syscall_whitelist;
   mode_t box_permission;
 };
 
+// TODO: Environment variables?
 struct Program {
   Arguments command;
+  // probably contain some variables
+  //  e.g. all mentioned at Environment::PathPair
+  //       ${RUNNUM}   (# of testdata in multiphase or output only)
+  //  will be automatically converted to real value by controller
   Environment env;
 
   ResLimit limits;
@@ -88,9 +93,10 @@ struct ParTask {
   std::vector<Program> programs;
   std::vector<OpenFile> files;
   std::vector<Pipe> pipes;
+  int processor_count; // number of processor needed
 };
 
-typedef std::vector<ParTask> Task;
+typedef std::list<ParTask> Task; // use list so that tasks can be merged easily
 typedef std::vector<struct taskstats/*struct cjail_result*/> RunResult;
 
 // --- used by controller ---
@@ -98,15 +104,15 @@ typedef std::vector<struct taskstats/*struct cjail_result*/> RunResult;
 typedef std::vector<std::vector<std::string>> StringTable;
 
 enum Verdict {
-  kAC = 0,  // Accepted
-  kWA,      // Wrong Answer
-  kTLE,     // Time Limit Exceeded
-  kMLE,     // Memory Limit Exceeded
-  kOLE,     // Output Limit Exceeded
-  kRE,      // Runtime Error (killed by signal)
-  kNE,      // Non-zero Exit status
-  kCE,      // Compilation Error
-  kJF       // Judgement Failed (internal error / timeout)
+  kVerdictAC = 0,  // Accepted
+  kVerdictWA,      // Wrong Answer
+  kVerdictTLE,     // Time Limit Exceeded
+  kVerdictMLE,     // Memory Limit Exceeded
+  kVerdictOLE,     // Output Limit Exceeded
+  kVerdictRE,      // Runtime Error (killed by signal)
+  kVerdictNE,      // Non-zero Exit status
+  kVerdictCE,      // Compilation Error
+  kVerdictJF       // Judgement Failed (internal error / timeout)
 };
 
 struct Problem { // This is what stored in problem metafile,
@@ -147,12 +153,12 @@ struct Problem { // This is what stored in problem metafile,
 };
 
 enum Stage {
-  kPreExec = 0,
-  kExecution = 1,
-  kEvaluation = 2,
-  kScoring = 3,
-  kPostScoring = 4,
-  kCompetition = -1
+  kStagePreExec = 0,
+  kStageExecution = 1,
+  kStageEvaluation = 2,
+  kStageScoring = 3,
+  kStagePostScoring = 4,
+  kStageCompetition = -1
 };
 
 struct Submission {

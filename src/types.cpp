@@ -5,6 +5,13 @@
 const int ResLimit::kNoLim;
 const int Submission::kAllTestdata;
 
+template <class T> T LimAdj::operator()(T val) const {
+  if (val == ResLimit::kNoLim || factor < 0)
+    return ResLimit::kNoLim;
+  T result = static_cast<T>(factor * val) + constant;
+  return result < 0 ? 0 : result;
+}
+
 JobGraph::VertexPtr JobGraph::InsertVertex(const Job& a) {
   vertices_.emplace_back(a);
   return vertices_.begin();
