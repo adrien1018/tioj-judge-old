@@ -3,17 +3,20 @@
 
 // This header defines types used in the judging process.
 
+// TODO: move some types to controller or grader
+
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 
 #include <sched.h>
 #include <sys/types.h>
-#include <linux/taskstats.h>
 
 #include <list>
 #include <string>
 #include <vector>
+
+// #include "cjail.h"
 
 typedef std::vector<std::string> Arguments;
 
@@ -117,9 +120,9 @@ enum Verdict {
 
 struct Problem { // This is what stored in problem metafile,
                  //  not necessary to read completely when evaluating submissions
-  struct Asset {
+  struct File {
     std::string filename;  // contains no path
-    mode_t perm;  //permission when copied into submission dir
+    mode_t perm;  // permission when copied into submission dir
   };
   struct LangSettings {
     Task pre_exec_stage;
@@ -134,7 +137,7 @@ struct Problem { // This is what stored in problem metafile,
 
   int id;  // problem id
   bool competition;
-  std::vector<Asset> assets;
+  std::vector<File> assets, user_files;
 
   // uid, mask, submission_dir, box_dir in Task struct are not filled
   std::vector<LangSettings> langs;
@@ -176,7 +179,11 @@ struct Submission {
 
 struct Job {
   Task tasks;
+  int serial_num;  // since the same submission may be rejudged, an unique
+                   //  serial number is needed to avoid unknown conflicts
+  int submission_id;
   Stage stage;
+  int testdata;  // exec and eval stage
   int priority;  // scheduling priority, small is prior
                  //  0-16777215, top 8 bits are judging priority
 };

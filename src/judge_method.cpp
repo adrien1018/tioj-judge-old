@@ -167,7 +167,7 @@ Task GenerateMethod(const CommonOpts& opts, Stage stage) {
           for (size_t i = 0; i < opts.arg; i++) {
             AddTask(opts.main_lang,
                     {UserPair("${USER_" + to_string(i) + "}"),
-                    AssetPair("${EXEC_" + to_string(i * 2 + 1) + "}")},
+                     AssetPair("${EXEC_" + to_string(i * 2 + 1) + "}")},
                     {AssetPair("${EXEC_" + to_string(i * 2) + "}")},
                     "exec" + to_string(i));
           }
