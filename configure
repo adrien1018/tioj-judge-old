@@ -1,47 +1,9 @@
 #!/usr/bin/env bash
 
-getopt --test > /dev/null
-if [[ $? -ne 4 ]]; then
-    echo "`getopt --test` failed"
-    exit 1
-fi
-
-LONGOPTIONS=boxpath:datapath:
-
-PARSED=$(getopt --options='' --longoptions=$LONGOPTIONS --name "$0" -- "$@")
+chmod +x configure.py
+echo '' | python3 2> /dev/null
 if [[ $? -ne 0 ]]; then
-    exit 2
+  echo 'Error: python3 not found'
+  exit 1
 fi
-
-eval set -- "$PARSED"
-BOXPATH="/tmp/tioj-box/"
-DATAPATH="/var/lib/tioj-judge/"
-
-while true; do
-	case "$1" in
-		--boxpath)
-			BOXPATH="$2"
-			shift 2
-			;;
-		--datapath)
-			DATAPATH="$2"
-			shift 2
-			;;
-		--)
-			shift
-			break
-			;;
-		*)
-			echo "Unexpected error"
-			exit 1
-			;;
-	esac
-done
-
-BOXPATH=${BOXPATH//\\/\\\\}
-BOXPATH=${BOXPATH//\"/\\\"}
-DATAPATH=${DATAPATH//\\/\\\\}
-DATAPATH=${DATAPATH//\"/\\\"}
-echo -e '#include "config.h"\n' > ./src/config.cpp
-echo 'const std::string kBoxPath = "'$BOXPATH'";' >> ./src/config.cpp
-echo 'const std::string kDataPath = "'$DATAPATH'";' >> ./src/config.cpp
+./configure.py $@
