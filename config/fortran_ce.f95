@@ -15,7 +15,7 @@ program main
 
   allocate (points(number_of_points))
 
-  read (*,*) points
+  read (*,*) point
 
 ! Take the average by summing points and dividing by number_of_points
   if (number_of_points > 0) average_points = sum(points)/number_of_points

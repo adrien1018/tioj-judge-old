@@ -65,6 +65,24 @@ run_stats['CCpp'] = combine_stats(
 
 # TODO: Add other langs, query dynamic linking libs and processes count
 
+# Fortran95
+print('Getting system call list of Fortran...')
+compile_stats['Fortran'] = combine_stats(
+    get_stats(['gfortran', '-std=f95', 'fortran_ce.f95', '-o', 'fortran_ce']), # compilation error
+    get_stats(['gfortran', '-std=f95', 'fortran_1.f95', '-o', 'fortran_1']))
+run_stats['Fortran'] = combine_stats(
+    get_stats(['./fortran_1'], '2\n2\n3'),
+    get_stats(['./fortran_1'], '2'))
+
+# C#
+print('Getting system call list of C#...')
+compile_stats['CSharp'] = combine_stats(
+    get_stats(['mcs', 'csharp_ce.cs']), # compilation error
+    get_stats(['mcs', 'csharp_1.cs']))
+run_stats['CSharp'] = combine_stats(
+    get_stats(['mono', './rust_1'], '19235\n21903\n'),
+    get_stats(['mono', './rust_1'], '19235'))
+
 # Python 2/3
 print('Getting system call list of Python...')
 run_stats['Python'] = combine_stats(
@@ -99,6 +117,7 @@ with open('src/config.cpp', 'w') as f:
         f.write('const std::string k_' + i[0] + 'Path = ' + c_string(i[1]) + ';\n')
     for i in compile_stats.items():
         f.write('const std::vector<std::string> k' + i[0] + 'CompileSyscalls = ' + c_string_list(i[1]) + ';\n')
+    f.write('\n')
     for i in run_stats.items():
         f.write('const std::vector<std::string> k' + i[0] + 'RunSyscalls = ' + c_string_list(i[1]) + ';\n')
 

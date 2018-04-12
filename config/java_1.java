@@ -3,7 +3,7 @@
 import java.io.*;
 import java.util.*;
 
-public class F1 {
+public class java_1 {
   FastScanner in;
   PrintWriter out;
   boolean systemIO = true;
@@ -149,6 +149,6 @@ public class F1 {
   }
 
   public static void main(String[] arg) {
-    new F1().run();
+    new java_1().run();
   }
 }

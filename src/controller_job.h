@@ -17,6 +17,6 @@ struct Request {
 
 // struct RunningJob (?
 
-void run_job_controller();
+void RunJobController();
 
 #endif
