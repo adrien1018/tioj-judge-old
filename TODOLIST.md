@@ -1,0 +1,5 @@
+ - [ ] Add basic types
+ - [ ] Write basic tests in gtest
+ - [ ] Scheduling policy
+ - [ ] Define metafile structures
+ - [ ] Write filestruct
