@@ -1,6 +1,8 @@
 # tioj-judge
 ### TIOJ judge client
 
+**Detail update needed!**
+
 Basic structure: **Communicator - Controller - Graders**
 
 ## 5-stage grading
