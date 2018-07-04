@@ -4,22 +4,36 @@
 #include <string>
 #include <vector>
 
+extern const std::string kMySQLHostname;
+extern const int kMySQLPort;
+extern const std::string kMySQLUsername, kMySQLPassword;
+extern const std::string kDatabaseName;
 extern const std::string kBoxPath, kDataPath;
 
+// used in file structures and custom judge options
 enum Languages {
-  kLangC11 = 1,
-  kLangC99 = 2,
-  kLangC90 = 3,
-  kLangCpp17 = 4,
-  kLangCpp14 = 5,
-  kLangCpp11 = 6,
-  kLangCpp98 = 7,
-  kLangPython2 = 8,
-  kLangPython3 = 9,
-  kLangHaskell = 10
+  kLangC       = 1,
+  kLangCpp     = 2,
+  kLangPython2 = 3,
+  kLangPython3 = 4,
+  kLangHaskell = 5
 };
 
-// First work on these, and add more when the details are finished
+// used in judging
+enum DefaultLanguages {
+  kDefLangC11     = 1,
+  kDefLangC99     = 2,
+  kDefLangC90     = 3,
+  kDefLangCpp17   = 4,
+  kDefLangCpp14   = 5,
+  kDefLangCpp11   = 6,
+  kDefLangCpp98   = 7,
+  kDefLangPython2 = 8,
+  kDefLangPython3 = 9,
+  kDefLangHaskell = 10
+};
+
+// First work on these languages, and add more when the details are finished
 
 // Path to binary files
 extern const std::string kGccPath;     // gcc
