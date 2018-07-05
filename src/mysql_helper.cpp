@@ -153,6 +153,7 @@ bool DatabaseTable::CheckTable(MySQLSession& sess) const {
   CreateTable_(sess, tmpname);
   std::string schema2 = GetSchema(sess, tmpname);
 
+  // names of constraints and keys does not matter
   std::regex pat1("CONSTRAINT `[^`]*`");
   std::regex pat2("KEY `[^`]*`");
   schema1 = std::regex_replace(schema1, pat1, "CONSTRAINT ");

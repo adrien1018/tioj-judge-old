@@ -17,4 +17,10 @@
 // Basic rule for MySQL database, table and column name
 bool IsValidName(const std::string&);
 
+// Convert raw timestamp value to string
+std::string DateTimeStr(long long);
+
+// Convert string to raw timestamp value
+long long DateTimeVal(const std::string&);
+
 #endif

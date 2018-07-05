@@ -11,7 +11,8 @@ extern const std::string kDatabaseName;
 extern const std::string kBoxPath, kDataPath;
 
 // used in file structures and custom judge options
-enum Languages {
+enum Language {
+  kLangNull    = 0,
   kLangC       = 1,
   kLangCpp     = 2,
   kLangPython2 = 3,
@@ -20,7 +21,7 @@ enum Languages {
 };
 
 // used in judging
-enum DefaultLanguages {
+enum DefaultLanguage {
   kDefLangC11     = 1,
   kDefLangC99     = 2,
   kDefLangC90     = 3,
