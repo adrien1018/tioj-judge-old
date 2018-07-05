@@ -30,7 +30,7 @@ const DatabaseTable kProbExtraAttrTable("problem_extra_attr",
       {"item_id",    "INT", "NOT NULL"},
       {"text",       "VARCHAR(8192)", "NOT NULL"}
     }, {{"problem_id"}},
-    "CONSTRAINT UItem PRIMARY KEY (problem_id, attr_id, item_id), "
+    "PRIMARY KEY (problem_id, attr_id, item_id), "
     "FOREIGN KEY (problem_id) REFERENCES problem_settings(problem_id)");
 const DatabaseTable kTestdataTable("testdata",
     {
@@ -39,7 +39,7 @@ const DatabaseTable kTestdataTable("testdata",
       {"file_id",     "INT", "NOT NULL"},
       {"timestamp",   "DATETIME(3)", "NOT NULL"}
     }, {{"problem_id"}, {"problem_id", "testdata_id"}},
-    "CONSTRAINT UFile PRIMARY KEY (problem_id, testdata_id, file_id), "
+    "PRIMARY KEY (problem_id, testdata_id, file_id), "
     "FOREIGN KEY (problem_id) REFERENCES problem_settings(problem_id)");
 const DatabaseTable kRangeTable("ranges",
     {
@@ -47,7 +47,7 @@ const DatabaseTable kRangeTable("ranges",
       {"range_id",   "INT",    "NOT NULL"},
       {"score",      "BIGINT", "NOT NULL"},
     }, {{"problem_id"}},
-    "CONSTRAINT URange PRIMARY KEY (problem_id, range_id), "
+    "PRIMARY KEY (problem_id, range_id), "
     "FOREIGN KEY (problem_id) REFERENCES problem_settings(problem_id)");
 const DatabaseTable kRangeMappingTable("range_mapping",
     {
@@ -73,20 +73,15 @@ void InitMySQLSession(MySQLSession& sess) {
     exit(1);
   }
   try {
-    sess.sql("USE %s;", kDatabaseName).execute();
+    sess.ChangeDatabase(kDatabaseName);
   } catch (const Error& err) {
-    try {
-      sess.sql("CREATE DATABASE %s;", kDatabaseName).execute();
-      sess.sql("USE %s;", kDatabaseName).execute();
-    } catch (const Error& err) {
-      cout << "Unexpected error\n" << err << '\n';
-      exit(1);
-    }
+    cout << "Unexpected error\n" << err << '\n';
+    exit(1);
   }
 
-  auto CheckTable = [&](const auto& a) {
+  auto CheckTable = [&](const DatabaseTable& a) {
     if (!a.IsExist(sess)) a.CreateTable(sess);
-    // TODO: Check table schema
+    else if (!a.CheckTable(sess)) throw std::logic_error("");
   };
   try {
     CheckTable(kProbSettingTable);

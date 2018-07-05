@@ -1,4 +1,5 @@
 src/config.cpp
 *.o
 *.swp
+test/*/main
 experiment/*

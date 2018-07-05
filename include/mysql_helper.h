@@ -13,6 +13,7 @@
 // MySQL Session wrapper to support late construction
 class MySQLSession {
   mysqlx::Session* sess_;
+  void CheckNull_() const;
 
   // C++-style sprintf
   template <class... T> std::string Format_(const std::string&, T...);
@@ -26,6 +27,9 @@ public:
 
   // start / restart a session
   template <class... T> void Start(T...);
+
+  // change to a database, if not exist then create it (if create)
+  void ChangeDatabase(const std::string&, bool create = true);
 
   // allow sprintf-like usage
   template <class... T> mysqlx::SqlStatement sql(const std::string&, T...);
@@ -55,6 +59,7 @@ void MySQLSession::Start(T... args) {
 
 template <class... T>
 mysqlx::SqlStatement MySQLSession::sql(const std::string& query, T... args) {
+  CheckNull_();
   _DEBUG2("query", Format_(query, args...));
   return sess_->sql(Format_(query, args...));
 }
@@ -75,12 +80,21 @@ private:
   std::vector<Index> indices_;
   std::string additional_;
   std::unordered_map<std::string, int> column_mp_;
+
+  void CreateTable_(MySQLSession&, const std::string&) const;
 public:
   DatabaseTable(std::string, ILStr2_, ILStr2_, std::string);
-  bool IsExist(MySQLSession&) const;
   const std::string& operator[](size_t) const;
   int operator[](const std::string&) const;
+
+  // Create the table
   void CreateTable(MySQLSession&) const;
+
+  // Check if the table exists
+  bool IsExist(MySQLSession&) const;
+
+  // Check if the table exists and is the same as the schema
+  bool CheckTable(MySQLSession&) const;
 };
 
 #endif
