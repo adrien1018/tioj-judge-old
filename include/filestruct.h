@@ -23,6 +23,8 @@ struct ProblemSettings {
 
   int problem_id;
 
+  bool is_one_stage;
+
   // whether to do code checking and the program language
   Language check_code_lang;
 
@@ -64,17 +66,17 @@ struct ProblemSettings {
   bool partial_judge;
 
   // evaluation types
-  static const int kEvalDefaultProgram = 0x10;
-  static const int kEvalOldSpecialJudge = 0x20;
-  static const int kEvalSpecialJudge = 0x30;
-  static const int kEvalTypeMask = 0xf0;
+  static const int kEvalDefaultProgram;
+  static const int kEvalOldSpecialJudge;
+  static const int kEvalSpecialJudge;
+  static const int kEvalTypeMask;
 
   // options of old-style evaluation
-  static const int kEvalOptNormal = 0x1; // 0 for AC
-  static const int kEvalOptFloat = 0x2; // output is in [0, 1], 1 for AC
-  static const int kEvalOptFloatNonzero = 0x3; // output is in [0, 1], nonzero for AC
-  static const int kEvalOptSkip = 0x8; // skip evaluation stage; use output of lib instead
-  static const int kEvalOptMask = 0xf;
+  static const int kEvalOptNormal; // 0 for AC
+  static const int kEvalOptFloat; // output is in [0, 1], 1 for AC
+  static const int kEvalOptFloatNonzero; // output is in [0, 1], nonzero for AC
+  static const int kEvalOptSkip; // skip evaluation stage; use output of lib instead
+  static const int kEvalOptMask;
 
   // bitwise-or of above options
   int evaluation_type;
@@ -104,6 +106,8 @@ struct ProblemSettings {
     kScoringWeighted = 2,
     kScoringSpecial = 3
   } scoring_type;
+  // compilation settings of evaluation program
+  // also used by 1-stage mode
   CompileSettings scoring_compile;
 
   // file count per testdata (usually 2: input and output)
@@ -118,6 +122,10 @@ struct ProblemSettings {
   };
   std::vector<FileInSandbox> testdata_file_path, common_file_path;
 
+  // used by 1-stage mode only; if true, kill old execution when new
+  // judge request of the same problem arrived
+  bool kill_old;
+
   // TODO: Sandbox settings struct
   // std::vector<std::pair<int, SandboxSettings>> custom_stage;
 
@@ -126,13 +134,6 @@ struct ProblemSettings {
 
   ProblemSettings();
 };
-
-const int ProblemSettings::kEvalDefaultProgram,
-    ProblemSettings::kEvalOldSpecialJudge, ProblemSettings::kEvalSpecialJudge,
-    ProblemSettings::kEvalTypeMask,
-    ProblemSettings::kEvalOptNormal, ProblemSettings::kEvalOptFloat,
-    ProblemSettings::kEvalOptFloatNonzero, ProblemSettings::kEvalOptSkip,
-    ProblemSettings::kEvalOptMask;
 
 // Initialize an MySQLSession and perform database/table check
 void InitMySQLSession(MySQLSession&);

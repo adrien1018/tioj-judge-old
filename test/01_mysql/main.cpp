@@ -162,6 +162,9 @@ TEST_F(DatabaseTableTest, CheckTable) {
   sess.sql("CREATE INDEX ON test (id,a);", index_name).execute();
   EXPECT_TRUE(schema.IsExist(sess));
   EXPECT_TRUE(schema.CheckTable(sess));
+
+  sess.sql("CREATE TABLE acpxzenkgt (id int);").execute();
+  EXPECT_TRUE(schema.CheckTable(sess)); // will use another temp table
 }
 
 } // namespace
