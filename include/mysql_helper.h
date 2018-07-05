@@ -27,6 +27,7 @@ public:
 
   // start / restart a session
   template <class... T> void Start(T...);
+  void Stop();
 
   // change to a database, if not exist then create it (if create)
   void ChangeDatabase(const std::string&, bool create = true);

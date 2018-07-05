@@ -26,6 +26,13 @@ MySQLSession::~MySQLSession() {
   if (sess_) delete sess_;
 }
 
+void MySQLSession::Stop() {
+  if (sess_) {
+    delete sess_;
+    sess_ = nullptr;
+  }
+}
+
 void MySQLSession::ChangeDatabase(const std::string& name, bool create) {
   if (create) {
     try {
@@ -101,12 +108,15 @@ DatabaseTable::DatabaseTable(std::string name, ILStr2_ col, ILStr2_ ind,
 }
 
 const std::string& DatabaseTable::operator[](size_t pos) const {
+  if (pos >= columns_.size()) {
+    throw std::out_of_range("column index out of range");
+  }
   return columns_[pos].name;
 }
 
 int DatabaseTable::operator[](const std::string& str) const {
   auto it = column_mp_.find(str);
-  if (it == column_mp_.end()) return -1;
+  if (it == column_mp_.end()) throw std::out_of_range("column not exist");
   return it->second;
 }
 
@@ -143,9 +153,12 @@ bool DatabaseTable::CheckTable(MySQLSession& sess) const {
   CreateTable_(sess, tmpname);
   std::string schema2 = GetSchema(sess, tmpname);
 
-  std::regex pat("CONSTRAINT `[^`]*`");
-  schema1 = std::regex_replace(schema1, pat, "CONSTRAINT ");
-  schema2 = std::regex_replace(schema2, pat, "CONSTRAINT ");
+  std::regex pat1("CONSTRAINT `[^`]*`");
+  std::regex pat2("KEY `[^`]*`");
+  schema1 = std::regex_replace(schema1, pat1, "CONSTRAINT ");
+  schema2 = std::regex_replace(schema2, pat1, "CONSTRAINT ");
+  schema1 = std::regex_replace(schema1, pat2, "KEY ");
+  schema2 = std::regex_replace(schema2, pat2, "KEY ");
   size_t pos1 = schema1.find('\n'), pos2 = schema2.find('\n');
   bool ret = schema1.substr(pos1) == schema2.substr(pos2);
 
