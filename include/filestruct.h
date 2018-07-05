@@ -18,6 +18,7 @@ struct ProblemSettings {
     Language lang;
     // additional compile flags
     Arguments args;
+    CompileSettings();
   };
 
   int problem_id;
@@ -93,10 +94,10 @@ struct ProblemSettings {
     } type;
     bool visible; // if true, it will be send to the web server
   };
-  std::vector<ResultColumn> eval_columns;
+  std::vector<ResultColumn> evaluation_columns;
 
   // if true, then those TLE/MLE/RE will still be evaluated
-  bool eval_nonnormal;
+  bool evaluation_nonnormal;
 
   enum ScoringType {
     kScoringNormal = 1,
@@ -106,7 +107,8 @@ struct ProblemSettings {
   CompileSettings scoring_compile;
 
   // file count per testdata (usually 2: input and output)
-  int file_per_testdata;
+  // common file count (lib excluded, usually 0)
+  int file_per_testdata, file_common_cnt;
 
   struct FileInSandbox {
     // stage only used by common file
@@ -119,10 +121,29 @@ struct ProblemSettings {
   // TODO: Sandbox settings struct
   // std::vector<std::pair<int, SandboxSettings>> custom_stage;
 
+  // TODO: Change to event counter (web server should be modified)
   long long timestamp;
+
+  ProblemSettings();
 };
+
+const int ProblemSettings::kEvalDefaultProgram,
+    ProblemSettings::kEvalOldSpecialJudge, ProblemSettings::kEvalSpecialJudge,
+    ProblemSettings::kEvalTypeMask,
+    ProblemSettings::kEvalOptNormal, ProblemSettings::kEvalOptFloat,
+    ProblemSettings::kEvalOptFloatNonzero, ProblemSettings::kEvalOptSkip,
+    ProblemSettings::kEvalOptMask;
 
 // Initialize an MySQLSession and perform database/table check
 void InitMySQLSession(MySQLSession&);
+
+// Get timestamp of a problem; if not exist, throw invalid_argument
+long long GetProblemTimestamp(MySQLSession&, int);
+
+// Get settings of a problem; if not exist, throw invalid_argument
+ProblemSettings GetProblemSettings(MySQLSession&, int);
+
+// Update settings of a problem
+void UpdateProblemSettings(MySQLSession&, const ProblemSettings&);
 
 #endif

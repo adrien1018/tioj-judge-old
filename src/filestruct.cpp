@@ -58,7 +58,27 @@ const DatabaseTable kRangeMappingTable("range_mapping",
     "FOREIGN KEY (problem_id, testdata_id) REFERENCES testdata(problem_id, testdata_id), "
     "FOREIGN KEY (problem_id, range_id) REFERENCES ranges(problem_id, range_id)");
 
-// Should sess be global?
+ProblemSettings::CompileSettings::CompileSettings() :
+    lang(kLangNull), args() {}
+
+// Default problem settings
+ProblemSettings::ProblemSettings() :
+    problem_id(0), check_code_lang(kLangNull), // no code checking
+    custom_lang(), // not used
+    execution_type(ProblemSettings::kExecNormal), // batch judge
+    execution_times(1), // not used
+    lib_name(), lib_compile(), // not used
+    pipe_in(false), pipe_out(false), // read from file
+    partial_judge(false), // judge whole problem
+    evaluation_type(ProblemSettings::kEvalDefaultProgram), // normal judge
+    evaluation_compile(), // no args: same as --line --string
+    evaluation_columns(), // no additional columns
+    scoring_type(ProblemSettings::kScoringNormal), // normal scoring
+    file_per_testdata(2), file_common_cnt(0), // no additional files
+    testdata_file_path(), common_file_path(),
+    timestamp(0) {}
+
+// QUESTION: Should sess be global?
 void InitMySQLSession(MySQLSession& sess) {
   using namespace mysqlx;
   using std::cout;
@@ -66,7 +86,7 @@ void InitMySQLSession(MySQLSession& sess) {
     cout << "Invalid database name: " << kDatabaseName << '\n';
     exit(1);
   }
-  try {
+  try { // use login specified in config.cpp
     sess.Start(kMySQLHostname, kMySQLPort, kMySQLUsername, kMySQLPassword);
   } catch (const Error& err) {
     cout << "Error while connecting to MySQL\n" << err << '\n';
