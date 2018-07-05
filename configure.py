@@ -2,6 +2,8 @@
 
 import argparse, subprocess, sys, os
 
+# TODO: MySQL config
+
 parser = argparse.ArgumentParser(description = '')
 parser.add_argument('--boxpath', default = '/tmp/tioj-box', help = 'Directory to make sandboxes (default: /tmp/tioj-box)')
 parser.add_argument('--datapath', default = '/var/lib/tioj-judge', help = 'Directory to store judge data (default: /var/lib/tioj-judge)')
@@ -33,7 +35,7 @@ def combine_stats(*res):
     ret = [*{*ret}]
     return ret
 
-prog_list = ['gcc', 'g++', 'mono', 'mcs', 'gfortran', 'ghc', 'javac', 'java', 'node', 'fpc', 'perl', 'python2', 'python3', 'ruby', 'rustc']
+prog_list = ['gcc', 'g++', 'ghc', 'python2', 'python3']
 prog_path = {}
 
 for prog in prog_list:
@@ -65,44 +67,11 @@ run_stats['CCpp'] = combine_stats(
 
 # TODO: Add other langs, query dynamic linking libs and processes count
 
-# Fortran95
-print('Getting system call list of Fortran...')
-compile_stats['Fortran'] = combine_stats(
-    get_stats(['gfortran', '-std=f95', 'fortran_ce.f95', '-o', 'fortran_ce']), # compilation error
-    get_stats(['gfortran', '-std=f95', 'fortran_1.f95', '-o', 'fortran_1']))
-run_stats['Fortran'] = combine_stats(
-    get_stats(['./fortran_1'], '2\n2\n3'),
-    get_stats(['./fortran_1'], '2'))
-
-# C#
-print('Getting system call list of C#...')
-compile_stats['CSharp'] = combine_stats(
-    get_stats(['mcs', 'csharp_ce.cs']), # compilation error
-    get_stats(['mcs', 'csharp_1.cs']))
-run_stats['CSharp'] = combine_stats(
-    get_stats(['mono', './rust_1'], '19235\n21903\n'),
-    get_stats(['mono', './rust_1'], '19235'))
-
 # Python 2/3
 print('Getting system call list of Python...')
 run_stats['Python'] = combine_stats(
     get_stats(['python3', 'python3_1.py'], '0'),
     get_stats(['python3', 'python3_1.py'], '1'))
-
-# Ruby
-print('Getting system call list of Ruby...')
-run_stats['Ruby'] = combine_stats(
-    get_stats(['ruby', 'ruby_1.rb'], '1 1\n1'),
-    get_stats(['ruby', 'ruby_1.rb'], '2 1\n1'))
-
-# Rust
-print('Getting system call list of Rust...')
-compile_stats['Rust'] = combine_stats(
-    get_stats(['rustc', 'rust_ce.rs']), # compilation error
-    get_stats(['rustc', 'rust_1.rs']))
-run_stats['Rust'] = combine_stats(
-    get_stats(['./rust_1'], '19235\n21903\n'),
-    get_stats(['./rust_1'], '19235\n021903\n'))
 
 os.chdir('../')
 print('Leaving directory...')
@@ -123,14 +92,6 @@ with open('src/config.cpp', 'w') as f:
 
 # C: gcc
 # Cpp: g++
-# CSharp: mono, mcs
-# Fortran: gfortran
 # Haskell: ghc
-# Java: javac, java (version!)
-# JavaScript: node
-# Pascal: fpc
-# Perl: perl
 # Python: python2, python3
-# Ruby: ruby
-# Rust: rustc
 
