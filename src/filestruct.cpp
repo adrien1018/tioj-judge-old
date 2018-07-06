@@ -8,22 +8,22 @@
 // MySQL table schema
 const DatabaseTable kProbSettingTable("problem_settings",
     { //*: used by both stages
-      {"problem_id",               "INT",   "UNIQUE NOT NULL"}, //*
-      {"is_one_stage",             "BOOL",  "NOT NULL"},        //*
-      {"check_code_lang",          "INT",   "NOT NULL"},
-      {"execution_type",           "INT",   "NOT NULL"},
-      {"pipe_in",                  "BOOL",  "NOT NULL"},
-      {"pipe_out",                 "BOOL",  "NOT NULL"},
-      {"partial_judge",            "BOOL",  "NOT NULL"},
-      {"evaluation_type",          "INT",   "NOT NULL"},
-      {"evaluation_format",        "INT",   "NOT NULL"},
-      {"password",                 "BIGINT","NOT NULL"},
-      {"evaluate_nonnormal",       "BOOL",  "NOT NULL"},
-      {"scoring_type",             "INT",   "NOT NULL"},        //*
-      {"file_per_testdata",        "INT",   "NOT NULL"},
-      {"file_common_cnt",          "INT",   "NOT NULL"},        //*
-      {"kill_old",                 "BOOL",  "NOT NULL"},        //1-stage only
-      {"timestamp",                "DATETIME(3)", "NOT NULL"},
+      {"problem_id",         "INT",    "UNIQUE NOT NULL"}, //*
+      {"is_one_stage",       "BOOL",   "NOT NULL"},        //*
+      {"check_code_lang",    "INT",    "NOT NULL"},
+      {"execution_type",     "INT",    "NOT NULL"},
+      {"pipe_in",            "BOOL",   "NOT NULL"},
+      {"pipe_out",           "BOOL",   "NOT NULL"},
+      {"partial_judge",      "BOOL",   "NOT NULL"},
+      {"evaluation_type",    "INT",    "NOT NULL"},
+      {"evaluation_format",  "INT",    "NOT NULL"},
+      {"password",           "BIGINT", "NOT NULL"},
+      {"evaluate_nonnormal", "BOOL",   "NOT NULL"},
+      {"scoring_type",       "INT",    "NOT NULL"},        //*
+      {"file_per_testdata",  "INT",    "NOT NULL"},
+      {"file_common_cnt",    "INT",    "NOT NULL"},        //*
+      {"kill_old",           "BOOL",   "NOT NULL"},        //1-stage only
+      {"timestamp",          "BIGINT", "NOT NULL"},
     }, {}, "PRIMARY KEY (problem_id)");
 const DatabaseTable kProbExtraAttrTable("problem_extra_attr",
     {
@@ -157,14 +157,16 @@ void InitMySQLSession(MySQLSession& sess, bool check) {
 long long GetProblemTimestamp(MySQLSession& sess, int id) {
   auto res = sess.sql("SELECT timestamp FROM problem_settings WHERE problem_id = ?;")
                   .bind(id).execute();
-  if (res.count() == 1) return static_cast<int64_t>(res.fetchOne()[0]);
+  if (res.count() == 1) {
+    return static_cast<int64_t>(res.fetchOne()[0]);
+  }
   throw std::invalid_argument("Unexpected result");
 }
 
 
 bool IsProbExist(MySQLSession& sess, int id) {
   return static_cast<int>(
-      sess.sql("SELECT EXISTS(SELECT 1 FROM problem_settings WHERE problem_id = ?;)")
+      sess.sql("SELECT EXISTS(SELECT 1 FROM problem_settings WHERE problem_id = ?);")
           .bind(id).execute().fetchOne()[0]);
 }
 
@@ -280,9 +282,9 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
   mysqlx::SqlStatement query(sess.sql(""));
   if (IsProbExist(sess, ps.problem_id)) {
     // delete additional attr first
-    sess.sql("DELETE FROM problem_settings WHERE problem_id = ?;")
+    sess.sql("DELETE FROM problem_extra_attr WHERE problem_id = ?;")
         .bind(ps.problem_id).execute();
-    query = sess.sql("UPDATE problem_settings SET"
+    query = sess.sql("UPDATE problem_settings SET "
         "is_one_stage = ?, check_code_lang = ?, execution_type = ?, "
         "pipe_in = ?, pipe_out = ?, partial_judge = ?, evaluation_type = ?, "
         "evaluation_format = ?, password = ?, evaluate_nonnormal = ?, "
@@ -310,7 +312,8 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
              ps.file_per_testdata,
              ps.file_common_cnt,
              static_cast<int>(ps.kill_old),
-             ps.timestamp, ps.problem_id).execute();
+             static_cast<int64_t>(ps.timestamp),
+             ps.problem_id).execute();
   for (const AttrEntry& attr : opts) {
     sess.sql("INSERT INTO problem_extra_attr VALUES (?, ?, ?, ?)")
         .bind(ps.problem_id, static_cast<int>(attr.type),
