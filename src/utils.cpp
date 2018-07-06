@@ -38,3 +38,27 @@ long long DateTimeVal(const std::string& str) {
   return (static_cast<long long>(timegm(&time_obj)) + kZeroToEpoch) * 1000
       + std::stoi(match[7]);
 }
+
+std::vector<std::string> SplitString(const std::string& a) {
+  if (!a.size()) return std::vector<std::string>();
+  bool flag1 = false, flag2 = false;
+  std::vector<std::string> res(1);
+  for (char i : a) {
+    if (flag1) {
+      if (i == '\"') flag1 = false, flag2 = true;
+      else res.back().push_back(i);
+    }
+    else {
+      if (i == '\"') {
+        flag1 = true;
+        if (flag2) flag2 = false, res.back().push_back('\"');
+      }
+      else if (i == ',') {
+        res.push_back("");
+        flag2 = false;
+      }
+      else res.back().push_back(i);
+    }
+  }
+  return res;
+}

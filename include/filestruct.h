@@ -32,7 +32,7 @@ struct ProblemSettings {
     CompileSettings compile;
     double tl_a, tl_b, ml_a, ml_b; // TL & ML adjustments
     // syscall adjustments; true for blacklist
-    std::pair<std::string, bool> syscall_adj;
+    std::vector<std::pair<std::string, bool>> syscall_adj;
   };
   // list of customized languages
   std::vector<CustomLanguage> custom_lang;
@@ -46,7 +46,7 @@ struct ProblemSettings {
     kExecCFInteractive = 6        // 1 user file, 1 judge file
   } execution_type;
 
-  // times of execution (N), used by interactive and multiphase
+  // times of execution (N), used by (old/new)interactive and multiphase
   int execution_times;
 
   // lib filename in each stage, length = N if multiphase,
@@ -66,22 +66,25 @@ struct ProblemSettings {
   bool partial_judge;
 
   // evaluation types
-  static const int kEvalDefaultProgram;
-  static const int kEvalOldSpecialJudge;
-  static const int kEvalSpecialJudge;
-  static const int kEvalTypeMask;
+  enum EvaluationType {
+    kEvalSkip = 0, // skip evaluation stage; use output of lib instead
+    kEvalNormal = 1,
+    kEvalDefaultProgram = 2,
+    kEvalOldSpecialJudge = 3,
+    kEvalSpecialJudge = 4
+  } evaluation_type;
 
-  // options of old-style evaluation
-  static const int kEvalOptNormal; // 0 for AC
-  static const int kEvalOptFloat; // output is in [0, 1], 1 for AC
-  static const int kEvalOptFloatNonzero; // output is in [0, 1], nonzero for AC
-  static const int kEvalOptSkip; // skip evaluation stage; use output of lib instead
-  static const int kEvalOptMask;
+  // options of old-style special judge or skipped evaluation
+  enum EvalOutputFormat {
+    kEvalFormatZero = 1, // 0 for AC
+    kEvalFormatFloat = 2, // output is in [0, 1], 1 for AC
+    kEvalFormatFloatNonzero = 3 // output is in [0, 1], nonzero for AC
+    // 2 & 3 will use a password to identify
+  } evaluation_format;
+  long long password;
 
-  // bitwise-or of above options
-  int evaluation_type;
   // compilation settings of evaluation program
-  // if use default program, then lang is not used, args is options of evaluation
+  // if use default program, then lang = null, args is options of evaluation
   CompileSettings evaluation_compile;
 
   struct ResultColumn {
@@ -99,7 +102,7 @@ struct ProblemSettings {
   std::vector<ResultColumn> evaluation_columns;
 
   // if true, then those TLE/MLE/RE will still be evaluated
-  bool evaluation_nonnormal;
+  bool evaluate_nonnormal;
 
   enum ScoringType {
     kScoringNormal = 1,
@@ -109,6 +112,7 @@ struct ProblemSettings {
   // compilation settings of evaluation program
   // also used by 1-stage mode
   CompileSettings scoring_compile;
+  std::vector<ResultColumn> scoring_columns;
 
   // file count per testdata (usually 2: input and output)
   // common file count (lib excluded, usually 0)
@@ -135,11 +139,14 @@ struct ProblemSettings {
   ProblemSettings();
 };
 
-// Initialize an MySQLSession and perform database/table check
-void InitMySQLSession(MySQLSession&);
+// Initialize an MySQLSession and perform database/table check (if true)
+void InitMySQLSession(MySQLSession&, bool check = true);
 
 // Get timestamp of a problem; if not exist, throw invalid_argument
 long long GetProblemTimestamp(MySQLSession&, int);
+
+// Check if settings is valid
+bool IsValidProblemSettings(const ProblemSettings&);
 
 // Get settings of a problem; if not exist, throw invalid_argument
 ProblemSettings GetProblemSettings(MySQLSession&, int);

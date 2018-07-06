@@ -1,3 +1,5 @@
+#include <set>
+#include <vector>
 #include <gtest/gtest.h>
 
 #include "utils.h"
@@ -41,6 +43,38 @@ TEST(DateTimeValTest, Main) {
   EXPECT_THROW(DateTimeVal("2388-03-01 08:03:01.8311"), std::invalid_argument);
   EXPECT_THROW(DateTimeVal("2388-3-01 08:03:01.811"), std::invalid_argument);
   EXPECT_THROW(DateTimeVal("388-03-01 08:03:01.811"), std::invalid_argument);
+}
+
+typedef std::vector<std::string> StrArray;
+
+TEST(SplitStringTest, Basic) {
+  EXPECT_EQ(StrArray({"1", "2", "3", "4", "5"}), SplitString("1,2,3,4,5"));
+  EXPECT_EQ(StrArray({"123"}), SplitString("123"));
+  EXPECT_EQ(StrArray(), SplitString(""));
+}
+
+TEST(SplitStringTest, SpecialChar) {
+  EXPECT_EQ(StrArray({"1", "2\"", "2a"}), SplitString("1,\"2\"\"\",2a"));
+  EXPECT_EQ(StrArray({"1", "2\n", "2a,"}), SplitString("1,\"2\n\",\"2a,\""));
+  EXPECT_EQ(StrArray({"喔", "哈"}), SplitString("喔,哈"));
+}
+
+TEST(MergeStringTest, String) {
+  StrArray vec;
+  vec = StrArray({"1", "2", "3", "4", "5"});
+  EXPECT_EQ("1,2,3,4,5", MergeString(vec.begin(), vec.end()));
+  EXPECT_EQ("1,2,3,4,5", MergeString(vec));
+  vec.clear();
+  EXPECT_EQ("", MergeString(vec));
+  EXPECT_EQ("\"\n\",\"123\"\"123\",\",,,\"",
+      MergeString(StrArray({"\n", "123\"123", ",,,"})));
+}
+
+TEST(MergeStringTest, Func) {
+  std::set<int> a({3,7,4,5,2,6,1,7});
+  auto IntToStr = [](int a){return std::to_string(a);};
+  EXPECT_EQ("1,2,3,4,5,6,7", MergeString(a.begin(), a.end(), IntToStr));
+  EXPECT_EQ("1,2,3,4,5,6,7", MergeString(a, IntToStr));
 }
 
 } // namespace
