@@ -33,6 +33,7 @@ struct ProblemSettings {
     double tl_a, tl_b, ml_a, ml_b; // TL & ML adjustments
     // syscall adjustments; true for blacklist
     std::vector<std::pair<std::string, bool>> syscall_adj;
+    CustomLanguage();
   };
   // list of customized languages
   std::vector<CustomLanguage> custom_lang;
@@ -98,6 +99,7 @@ struct ProblemSettings {
       // QUESTION: should this exist?
     } type;
     bool visible; // if true, it will be send to the web server
+    ResultColumn();
   };
   std::vector<ResultColumn> evaluation_columns;
 
@@ -119,10 +121,11 @@ struct ProblemSettings {
   int file_per_testdata, file_common_cnt;
 
   struct FileInSandbox {
-    // stage only used by common file
+    // stage (1~4) only used by common file
     int id, stage;
     // path of file in sandbox
     std::string path;
+    FileInSandbox();
   };
   std::vector<FileInSandbox> testdata_file_path, common_file_path;
 

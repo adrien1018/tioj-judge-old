@@ -59,6 +59,12 @@ TEST(UpdateProblemSettingsTest, MainProbSettings) {
   sess.sql("DELETE FROM problem_settings;").execute();
 }
 
+bool CheckSame(const ProblemSettings& prob) {
+  UpdateProblemSettings(sess, prob);
+  ProblemSettings prob2(GetProblemSettings(sess, prob.problem_id));
+  return prob == prob2;
+}
+
 TEST(GetProblemTimestampTest, Main) {
   // now problem_settings are empty
   EXPECT_THROW(GetProblemTimestamp(sess, 1001), std::invalid_argument);

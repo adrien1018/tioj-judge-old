@@ -28,11 +28,11 @@ const DatabaseTable kProbSettingTable("problem_settings",
 const DatabaseTable kProbExtraAttrTable("problem_extra_attr",
     {
       {"problem_id", "INT", "NOT NULL"},
-      {"attr_id",    "INT", "NOT NULL"},
+      {"type_id",    "INT", "NOT NULL"},
       {"item_id",    "INT", "NOT NULL"},
       {"text",       "VARCHAR(8192)", "NOT NULL"}
     }, {{"problem_id"}},
-    "PRIMARY KEY (problem_id, attr_id, item_id), "
+    "PRIMARY KEY (problem_id, type_id, item_id), "
     "FOREIGN KEY (problem_id) REFERENCES problem_settings(problem_id)");
 const DatabaseTable kTestdataTable("testdata",
     {
@@ -88,8 +88,15 @@ const DatabaseTable kTestdataResultTable("testdata_results",
     "PRIMARY KEY (submission_id, testdata_id), "
     "FOREIGN KEY (submission_id) REFERENCES submissions(submission_id)");
 
+// Some default constuctors
 ProblemSettings::CompileSettings::CompileSettings() :
     lang(kLangNull), args() {}
+ProblemSettings::CustomLanguage::CustomLanguage() :
+    compile(), tl_a(1.), tl_b(0.), ml_a(1.), ml_b(0.), syscall_adj() {}
+ProblemSettings::ResultColumn::ResultColumn() :
+    type(ProblemSettings::ResultColumn::kScoreFloat), visible(true) {}
+ProblemSettings::FileInSandbox::FileInSandbox() :
+    id(0), stage(0), path() {}
 
 // Default problem settings
 ProblemSettings::ProblemSettings() :
@@ -157,18 +164,17 @@ void InitMySQLSession(MySQLSession& sess, bool check) {
 long long GetProblemTimestamp(MySQLSession& sess, int id) {
   auto res = sess.sql("SELECT timestamp FROM problem_settings WHERE problem_id = ?;")
                   .bind(id).execute();
-  if (res.count() == 1) {
-    return static_cast<int64_t>(res.fetchOne()[0]);
+  if (res.count() == 0) {
+    throw std::invalid_argument("Problem not exist");
   }
-  throw std::invalid_argument("Unexpected result");
+  if (res.count() > 1) {
+    std::cerr << "Duplicate problem entry?\n";
+    exit(1);
+  }
+  return static_cast<int64_t>(res.fetchOne()[0]);
 }
 
-
-bool IsProbExist(MySQLSession& sess, int id) {
-  return static_cast<int>(
-      sess.sql("SELECT EXISTS(SELECT 1 FROM problem_settings WHERE problem_id = ?);")
-          .bind(id).execute().fetchOne()[0]);
-}
+//
 
 struct AttrEntry {
   enum AttrType {
@@ -190,6 +196,144 @@ struct AttrEntry {
   AttrEntry(AttrType t, int id, std::string&& tx) :
       type(t), item_id(id), text(std::move(tx)) {}
 };
+
+template <class Iter>
+ProblemSettings::CompileSettings ParseCompileSettings(Iter first, Iter last) {
+  ProblemSettings::CompileSettings s;
+  s.lang = static_cast<Language>(std::stoi(*first++));
+  s.args = Arguments(++first, last);
+  return s;
+}
+
+ProblemSettings::ResultColumn ParseColumn(const std::vector<std::string>& vec) {
+  ProblemSettings::ResultColumn s;
+  s.type = static_cast<ProblemSettings::ResultColumn::ColumnType>(
+      std::stoi(vec[0]));
+  s.visible = vec[1] == "1";
+  return s;
+}
+
+ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
+  auto raw = sess.sql("SELECT * FROM problem_settings WHERE problem_id = ?;")
+                 .bind(id).execute();
+  if (raw.count() == 0) {
+    throw std::invalid_argument("Problem not exist");
+  }
+  if (raw.count() > 1) {
+    std::cerr << "Duplicate problem entry?\n";
+    exit(1);
+  }
+  ProblemSettings ps;
+  auto res = raw.fetchOne();
+  auto Get = [&res](int z) { return static_cast<int>(z); };
+
+  ps.problem_id = Get(0);
+  ps.is_one_stage = Get(1);
+  ps.check_code_lang = static_cast<Language>(Get(2));
+  ps.execution_type = static_cast<ProblemSettings::ExecutionType>(Get(3));
+  ps.pipe_in = Get(4);
+  ps.pipe_out = Get(5);
+  ps.partial_judge = Get(6);
+  ps.evaluation_type = static_cast<ProblemSettings::EvaluationType>(Get(7));
+  ps.evaluation_format = static_cast<ProblemSettings::EvalOutputFormat>(Get(8));
+  ps.password = static_cast<int64_t>(res[9]);
+  ps.evaluate_nonnormal = Get(10);
+  ps.scoring_type = static_cast<ProblemSettings::ScoringType>(Get(11));
+  ps.file_per_testdata = Get(12);
+  ps.file_common_cnt = Get(13);
+  ps.kill_old = Get(14);
+  ps.timestamp = static_cast<int64_t>(Get(15));
+
+  raw = sess.sql("SELECT * FROM problem_extra_attr WHERE problem_id = ?"
+                 "ORDER BY type_id, item_id").bind(id).execute();
+  for (; raw.count() != 0;) {
+    res = raw.fetchOne();
+    AttrEntry::AttrType type = static_cast<AttrEntry::AttrType>(Get(1));
+    int item_id = Get(2);
+    std::vector<std::string> cont = SplitString(res[3]);
+    switch (type) {
+      case AttrEntry::kCustomLangSettings: {
+        ProblemSettings::CustomLanguage s;
+        s.tl_a = std::stod(cont[0]);
+        s.tl_b = std::stod(cont[1]);
+        s.ml_a = std::stod(cont[2]);
+        s.ml_b = std::stod(cont[3]);
+        size_t sysadjcnt = std::stoi(cont[4]);
+        for (size_t i = 0; i < sysadjcnt; i++) {
+          auto& cur = cont[i + 5];
+          s.syscall_adj.emplace_back(cur.substr(1), cur[0] == '-');
+        }
+        s.compile = ParseCompileSettings(cont.begin() + (sysadjcnt + 5),
+            cont.end());
+        ps.custom_lang.push_back(s);
+        break;
+      }
+      case AttrEntry::kExecSettings: {
+        switch (ps.execution_type) {
+          case ProblemSettings::kExecNormal: break;
+          case ProblemSettings::kExecOldInteractive: // fall through
+          case ProblemSettings::kExecInteractive: {
+            ps.execution_times = std::stoi(cont[0]);
+            ps.lib_name.push_back(cont[1]);
+            break;
+          }
+          case ProblemSettings::kExecMultiPhaseSeparated: {
+            if (item_id == -1) ps.execution_times = std::stoi(cont[0]);
+            else ps.lib_name.push_back(cont[0]);
+            break;
+          }
+          case ProblemSettings::kExecCFInteractive: // fall through
+          case ProblemSettings::kExecOutputOnly: {
+            ps.lib_compile = ParseCompileSettings(cont.begin(), cont.end());
+            break;
+          }
+        }
+      }
+      case AttrEntry::kEvalOption: {
+        ps.evaluation_compile = ParseCompileSettings(cont.begin(), cont.end());
+        break;
+      }
+      case AttrEntry::kScoringOption: {
+        ps.scoring_compile = ParseCompileSettings(cont.begin(), cont.end());
+        break;
+      }
+      case AttrEntry::kEvalColumn: {
+        ps.evaluation_columns.push_back(ParseColumn(cont));
+        break;
+      }
+      case AttrEntry::kScoringColumn: {
+        ps.scoring_columns.push_back(ParseColumn(cont));
+        break;
+      }
+      case AttrEntry::kTestdataFile: {
+        ProblemSettings::FileInSandbox f;
+        f.id = item_id;
+        f.stage = 0;
+        f.path = cont[0];
+        ps.testdata_file_path.push_back(f);
+        break;
+      }
+      case AttrEntry::kCommonFile: {
+        ProblemSettings::FileInSandbox f;
+        f.id = item_id;
+        f.stage = std::stoi(cont[0]);
+        f.path = cont[1];
+        ps.common_file_path.push_back(f);
+        break;
+      }
+      case AttrEntry::kCustomStage: {
+        // TODO
+      }
+    }
+  }
+  return ps;
+}
+
+bool IsProbExist(MySQLSession& sess, int id) {
+  return static_cast<int>(
+      sess.sql("SELECT EXISTS(SELECT 1 FROM problem_settings WHERE problem_id = ?);")
+          .bind(id).execute().fetchOne()[0]);
+}
 
 auto DoubleToStr = [](double a) {
   std::stringstream ss;
@@ -215,15 +359,16 @@ std::string CustomLanguageToStr(const ProblemSettings::CustomLanguage& s) {
 }
 
 std::string ColumnToStr(const ProblemSettings::ResultColumn& s) {
-  return MergeString(std::to_string(s.type), std::to_string(s.visible));
+  return MergeString(std::to_string(static_cast<int>(s.type)),
+                     std::string(s.visible ? "1" : "0"));
 }
 
 void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
   std::vector<AttrEntry> opts;
   // CustomLangSettings
-  for (const ProblemSettings::CustomLanguage& i : ps.custom_lang) {
-    opts.emplace_back(AttrEntry::kCustomLangSettings, i.compile.lang,
-        CustomLanguageToStr(i));
+  for (size_t i = 0; i < ps.custom_lang.size(); i++) {
+    opts.emplace_back(AttrEntry::kCustomLangSettings, i,
+        CustomLanguageToStr(ps.custom_lang[i]));
   }
   // ExecSettings
   switch (ps.execution_type) {
@@ -274,7 +419,7 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
   }
   for (const ProblemSettings::FileInSandbox& f : ps.common_file_path) {
     opts.emplace_back(AttrEntry::kCommonFile, f.id,
-        MergeString(std::to_string(f.id), f.path));
+        MergeString(std::to_string(f.stage), f.path));
   }
   // TODO: SandboxSettings
 
