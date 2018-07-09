@@ -10,7 +10,7 @@ const DatabaseTable kProbSettingTable("problem_settings",
     { //*: used by both stages
       {"problem_id",         "INT",    "UNIQUE NOT NULL"}, //*
       {"is_one_stage",       "BOOL",   "NOT NULL"},        //*
-      {"check_code_lang",    "INT",    "NOT NULL"},
+      {"check_code",         "BOOL",   "NOT NULL"},
       {"execution_type",     "INT",    "NOT NULL"},
       {"pipe_in",            "BOOL",   "NOT NULL"},
       {"pipe_out",           "BOOL",   "NOT NULL"},
@@ -96,13 +96,13 @@ ProblemSettings::CustomLanguage::CustomLanguage() :
 ProblemSettings::ResultColumn::ResultColumn() :
     type(ProblemSettings::ResultColumn::kScoreFloat), visible(true) {}
 ProblemSettings::FileInSandbox::FileInSandbox() :
-    id(0), stage(0), path() {}
+    id(0), stages{0, 1, 0, 0}, path() {}
 
 // Default problem settings
 ProblemSettings::ProblemSettings() :
     problem_id(0),
     is_one_stage(false), // 4-stage mode
-    check_code_lang(kLangNull), // no code checking
+    code_check_compile(), // no code checking
     custom_lang(), // not used
     execution_type(ProblemSettings::kExecNormal), // batch judge
     execution_times(1), // not used
@@ -110,8 +110,11 @@ ProblemSettings::ProblemSettings() :
     pipe_in(false), pipe_out(false), // read from file
     partial_judge(false), // judge whole problem
     evaluation_type(ProblemSettings::kEvalNormal), // normal judge
+    evaluation_format(ProblemSettings::kEvalFormatZero), // not used
+    password(0),
     evaluation_compile(), // not used
     evaluation_columns(), // no additional columns
+    evaluate_nonnormal(false),
     scoring_type(ProblemSettings::kScoringNormal), // normal scoring
     file_per_testdata(2), file_common_cnt(0), // no additional files
     testdata_file_path(), common_file_path(),
@@ -178,15 +181,16 @@ long long GetProblemTimestamp(MySQLSession& sess, int id) {
 
 struct AttrEntry {
   enum AttrType {
-    kCustomLangSettings = 1,
-    kExecSettings = 2,
-    kEvalOption = 3,
-    kEvalColumn = 4,
-    kScoringOption = 5,
-    kScoringColumn = 6,
-    kTestdataFile = 7,
-    kCommonFile = 8,
-    kCustomStage = 9
+    kCodeCheckOption = 1,
+    kCustomLangSettings = 2,
+    kExecSettings = 3,
+    kEvalOption = 4,
+    kEvalColumn = 5,
+    kScoringOption = 6,
+    kScoringColumn = 7,
+    kTestdataFile = 8,
+    kCommonFile = 9,
+    kCustomStage = 10
   } type;
   int item_id;
   std::string text;
@@ -225,11 +229,12 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
   }
   ProblemSettings ps;
   auto res = raw.fetchOne();
-  auto Get = [&res](int z) { return static_cast<int>(z); };
+  auto Get = [&res](int z) { return static_cast<int>(res[z]); };
 
   ps.problem_id = Get(0);
   ps.is_one_stage = Get(1);
-  ps.check_code_lang = static_cast<Language>(Get(2));
+  // ProblemSettings::CompileSettings::lang is null by default
+  // if (!Get(2)) ps.check_code_compile.lang = kLangNull;
   ps.execution_type = static_cast<ProblemSettings::ExecutionType>(Get(3));
   ps.pipe_in = Get(4);
   ps.pipe_out = Get(5);
@@ -244,7 +249,7 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
   ps.kill_old = Get(14);
   ps.timestamp = static_cast<int64_t>(Get(15));
 
-  raw = sess.sql("SELECT * FROM problem_extra_attr WHERE problem_id = ?"
+  raw = sess.sql("SELECT * FROM problem_extra_attr WHERE problem_id = ? "
                  "ORDER BY type_id, item_id").bind(id).execute();
   for (; raw.count() != 0;) {
     res = raw.fetchOne();
@@ -252,6 +257,10 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
     int item_id = Get(2);
     std::vector<std::string> cont = SplitString(res[3]);
     switch (type) {
+      case AttrEntry::kCodeCheckOption: {
+        ps.code_check_compile = ParseCompileSettings(cont.begin(), cont.end());
+        break;
+      }
       case AttrEntry::kCustomLangSettings: {
         ProblemSettings::CustomLanguage s;
         s.tl_a = std::stod(cont[0]);
@@ -288,6 +297,7 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
             break;
           }
         }
+        break;
       }
       case AttrEntry::kEvalOption: {
         ps.evaluation_compile = ParseCompileSettings(cont.begin(), cont.end());
@@ -308,16 +318,16 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
       case AttrEntry::kTestdataFile: {
         ProblemSettings::FileInSandbox f;
         f.id = item_id;
-        f.stage = 0;
-        f.path = cont[0];
+        for (int i = 0; i < 4; i++) f.stages[i] = cont[i] == "1";
+        f.path = cont[4];
         ps.testdata_file_path.push_back(f);
         break;
       }
       case AttrEntry::kCommonFile: {
         ProblemSettings::FileInSandbox f;
         f.id = item_id;
-        f.stage = std::stoi(cont[0]);
-        f.path = cont[1];
+        for (int i = 0; i < 4; i++) f.stages[i] = cont[i] == "1";
+        f.path = cont[4];
         ps.common_file_path.push_back(f);
         break;
       }
@@ -358,6 +368,13 @@ std::string CustomLanguageToStr(const ProblemSettings::CustomLanguage& s) {
       CompileSettingsToStr(s.compile))); // compile settings
 }
 
+std::string FileInSandboxToStr(const ProblemSettings::FileInSandbox& s) {
+  std::vector<std::string> vec;
+  for (int i = 0; i < 4; i++) vec.push_back(s.stages[i] ? "1" : "0");
+  vec.push_back(s.path);
+  return MergeString(vec);
+}
+
 std::string ColumnToStr(const ProblemSettings::ResultColumn& s) {
   return MergeString(std::to_string(static_cast<int>(s.type)),
                      std::string(s.visible ? "1" : "0"));
@@ -365,6 +382,11 @@ std::string ColumnToStr(const ProblemSettings::ResultColumn& s) {
 
 void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
   std::vector<AttrEntry> opts;
+  // CodeCheckOption
+  if (ps.code_check_compile.lang != kLangNull) {
+    opts.emplace_back(AttrEntry::kCodeCheckOption, 0,
+        CompileSettingsToStr(ps.code_check_compile));
+  }
   // CustomLangSettings
   for (size_t i = 0; i < ps.custom_lang.size(); i++) {
     opts.emplace_back(AttrEntry::kCustomLangSettings, i,
@@ -400,7 +422,8 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
     opts.emplace_back(AttrEntry::kEvalOption, 0,
         CompileSettingsToStr(ps.evaluation_compile));
   }
-  if (ps.scoring_type != ProblemSettings::kScoringNormal) {
+  if (ps.scoring_type != ProblemSettings::kScoringNormal ||
+      ps.is_one_stage) {
     opts.emplace_back(AttrEntry::kScoringOption, 0,
         CompileSettingsToStr(ps.scoring_compile));
   }
@@ -415,11 +438,10 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
   }
   // TestdataFile, CommonFile
   for (const ProblemSettings::FileInSandbox& f : ps.testdata_file_path) {
-    opts.emplace_back(AttrEntry::kTestdataFile, f.id, f.path);
+    opts.emplace_back(AttrEntry::kTestdataFile, f.id, FileInSandboxToStr(f));
   }
   for (const ProblemSettings::FileInSandbox& f : ps.common_file_path) {
-    opts.emplace_back(AttrEntry::kCommonFile, f.id,
-        MergeString(std::to_string(f.stage), f.path));
+    opts.emplace_back(AttrEntry::kCommonFile, f.id, FileInSandboxToStr(f));
   }
   // TODO: SandboxSettings
 
@@ -430,21 +452,21 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
     sess.sql("DELETE FROM problem_extra_attr WHERE problem_id = ?;")
         .bind(ps.problem_id).execute();
     query = sess.sql("UPDATE problem_settings SET "
-        "is_one_stage = ?, check_code_lang = ?, execution_type = ?, "
+        "is_one_stage = ?, check_code = ?, execution_type = ?, "
         "pipe_in = ?, pipe_out = ?, partial_judge = ?, evaluation_type = ?, "
         "evaluation_format = ?, password = ?, evaluate_nonnormal = ?, "
         "scoring_type = ?, file_per_testdata = ?, file_common_cnt = ?, "
         "kill_old = ?, timestamp = ? WHERE problem_id = ?;");
   } else {
     query = sess.sql("INSERT INTO problem_settings ("
-        "is_one_stage, check_code_lang, execution_type, pipe_in, pipe_out, "
+        "is_one_stage, check_code, execution_type, pipe_in, pipe_out, "
         "partial_judge, evaluation_type, evaluation_format, password, "
         "evaluate_nonnormal, scoring_type, file_per_testdata, file_common_cnt, "
         "kill_old, timestamp, problem_id) VALUES "
         "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
   }
   query.bind(static_cast<int>(ps.is_one_stage),
-             static_cast<int>(ps.check_code_lang),
+             static_cast<int>(ps.code_check_compile.lang != kLangNull),
              static_cast<int>(ps.execution_type),
              static_cast<int>(ps.pipe_in),
              static_cast<int>(ps.pipe_out),

@@ -26,7 +26,7 @@ struct ProblemSettings {
   bool is_one_stage;
 
   // whether to do code checking and the program language
-  Language check_code_lang;
+  CompileSettings code_check_compile;
 
   struct CustomLanguage {
     CompileSettings compile;
@@ -121,8 +121,8 @@ struct ProblemSettings {
   int file_per_testdata, file_common_cnt;
 
   struct FileInSandbox {
-    // stage (1~4) only used by common file
-    int id, stage;
+    int id;
+    bool stages[4];
     // path of file in sandbox
     std::string path;
     FileInSandbox();
