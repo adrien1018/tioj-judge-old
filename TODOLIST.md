@@ -1,5 +1,5 @@
- - [ ] Add basic types
- - [ ] Write basic tests in gtest
+ - [ ] Problem settings checking
+ - [ ] Add sandbox & testdata structures
+ - [ ] Revise communicator structure (change to single thread)
  - [ ] Scheduling policy
- - [ ] Define metafile structures
- - [ ] Write filestruct
+ - [ ] Revise README
