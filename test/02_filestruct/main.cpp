@@ -19,27 +19,30 @@ SAME(ProblemSettings::CompileSettings) {
   return CHK(lang) && CHK(args);
 }
 SAME(ProblemSettings::CustomLanguage) {
-  return CHK(compile) && CHK(tl_a) && CHK(tl_b) && CHK(ml_a) && CHK(ml_b) &&
-         CHK(syscall_adj);
+  return CHK(compile) && CHK(as_interpreter) && CHK(tl_a) && CHK(tl_b) &&
+         CHK(ml_a) && CHK(ml_b) && CHK(syscall_adj);
 }
 SAME(ProblemSettings::ResultColumn) {
   return CHK(type) && CHK(visible);
 }
-SAME(ProblemSettings::FileInSandbox) {
-  return CHK(id) && CHK(stages[0]) && CHK(stages[1]) && CHK(stages[2]) &&
-         CHK(stages[3]) && CHK(path);
+SAME(ProblemSettings::TestdataFile) {
+  return CHK(id) && CHK(path);
+}
+SAME(ProblemSettings::CommonFile) {
+  return CHK(usage) && CHK(lib_lang) && CHK(id) && CHK(stages[0]) &&
+         CHK(stages[1]) && CHK(stages[2]) && CHK(stages[3]) && CHK(file_id) &&
+         CHK(path);
 }
 SAME(ProblemSettings) {
   return CHK(problem_id) && CHK(is_one_stage) && CHK(code_check_compile) &&
          CHK(custom_lang) && CHK(execution_type) && CHK(execution_times) &&
-         CHK(lib_name) && CHK(lib_compile) && CHK(pipe_in) && CHK(pipe_out) &&
+         CHK(lib_compile) && CHK(pipe_in) && CHK(pipe_out) &&
          CHK(partial_judge) && CHK(evaluation_type) && CHK(evaluation_format) &&
          CHK(password) && CHK(evaluation_compile) && CHK(evaluation_columns) &&
          CHK(evaluate_nonnormal) && CHK(scoring_type) && CHK(scoring_compile) &&
          CHK(scoring_columns) && CHK(file_per_testdata) &&
-         CHK(file_common_cnt) && CHK(testdata_file_path) &&
-         CHK(common_file_path) && CHK(kill_old) &&
-         /*CHK(custom_stage) && */CHK(timestamp);
+         CHK(testdata_files) && CHK(common_files) && CHK(kill_old) &&
+         CHK(custom_stage) && CHK(timestamp);
 }
 
 namespace {
@@ -151,19 +154,39 @@ TEST_F(ProbSettingsRWTest, CustomLang) {
 }
 
 TEST_F(ProbSettingsRWTest, ExecSettings) {
+  ProblemSettings::CommonFile f;
+  f.usage = ProblemSettings::CommonFile::kLib;
+  f.lib_lang = kLangCpp;
+  f.id = 0;
+  f.file_id = 15;
+  f.path = "lib1234.h";
+
   prob.execution_type = ProblemSettings::kExecOldInteractive;
   prob.execution_times = 3;
-  prob.lib_name = {"lib1234.h"};
+  prob.common_files.push_back(f);
   CHECK;
   prob.execution_type = ProblemSettings::kExecInteractive;
+  f.lib_lang = kLangC;
+  f.file_id = 19;
+  prob.common_files.push_back(f);
   CHECK;
+  prob.common_files.clear();
+
   prob.execution_type = ProblemSettings::kExecMultiPhaseSeparated;
-  prob.lib_name = {"a.h", "b.h", "c.h"};
+  f.path = "a.h"; f.file_id = 16; f.id = 0;
+  prob.common_files.push_back(f);
+  f.path = "b.h"; f.file_id = 17; f.id = 1;
+  prob.common_files.push_back(f);
+  f.path = "c.h"; f.file_id = 33; f.id = 2;
+  prob.common_files.push_back(f);
   CHECK;
-  prob.lib_name.clear();
+  prob.common_files.clear();
+
   prob.execution_type = ProblemSettings::kExecCFInteractive;
   prob.lib_compile = comp;
   prob.execution_times = 1;
+  f.path = "lib.cpp"; f.lib_lang = kLangNull; f.id = 0;
+  prob.common_files.push_back(f);
   CHECK;
   prob.execution_type = ProblemSettings::kExecOutputOnly;
   CHECK;
@@ -208,32 +231,46 @@ TEST_F(ProbSettingsRWTest, Scoring) {
   CHECK;
 }
 
-TEST_F(ProbSettingsRWTest, FileInSandbox) {
+TEST_F(ProbSettingsRWTest, TestdataFile) {
   prob.file_per_testdata = 3;
-  prob.file_common_cnt = 3;
   CHECK;
-  ProblemSettings::FileInSandbox f;
+  ProblemSettings::TestdataFile f;
   f.id = 0;
   f.path = "test1";
-  prob.testdata_file_path.push_back(f);
+  prob.testdata_files.push_back(f);
   CHECK;
   f.id = 1;
   f.path = "test3";
+  prob.testdata_files.push_back(f);
+  CHECK;
+}
+
+TEST_F(ProbSettingsRWTest, CommonFile) {
+  ProblemSettings::CommonFile f;
+  f.usage = ProblemSettings::CommonFile::kOther;
   f.stages[2] = true;
-  prob.testdata_file_path.push_back(f);
+  f.file_id = 15; f.path = "g.test";
+  prob.common_files.push_back(f);
   CHECK;
-  f.path = "abc/abc.test";
-  prob.common_file_path.push_back(f);
+  f.stages[3] = true;
+  f.file_id = 5; f.path = "abc/abc.test";
+  prob.common_files.push_back(f);
   CHECK;
-  f.id = 2;
-  f.path = "test\"test";
-  prob.common_file_path.push_back(f);
+  f.stages[0] = true; f.stages[1] = true; f.stages[2] = false;
+  f.file_id = 2; f.path = "test\"test";
+  prob.common_files.push_back(f);
   CHECK;
 }
 
 TEST_F(ProbSettingsRWTest, CustomStage) {
+  ProblemSettings::CommonFile f;
+  f.usage = ProblemSettings::CommonFile::kCustomStage;
+  f.id = 1; f.file_id = 34;
+  prob.common_files.push_back(f);
   prob.custom_stage.emplace_back(1, comp);
   CHECK;
+  f.id = 2; f.file_id = 77;
+  prob.common_files.push_back(f);
   prob.custom_stage.emplace_back(2, comp);
   CHECK;
 }

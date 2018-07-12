@@ -64,6 +64,8 @@ inline std::string MergeString(const T& cont, Func tostr) {
 inline std::string MergeString(const std::vector<std::string>& vec) {
   return MergeString(vec.begin(), vec.end());
 }
+// caution: only use when both sides are in csv format
+//  (a string with no ',' and '\"' is in valid format, like numbers)
 inline std::string MergeString(const std::string& a, const std::string& b) {
   if (a.empty()) return b;
   if (b.empty()) return a;

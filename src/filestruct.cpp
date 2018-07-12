@@ -1,11 +1,15 @@
 #include "filestruct.h"
 
+#include <cmath>
 #include <sstream>
 #include <iomanip>
 
 #include "config.h"
 
-// MySQL table schema
+typedef std::vector<std::string> StrVec;
+
+// ----- MySQL table schema -----
+
 const DatabaseTable kProbSettingTable("problem_settings",
     { //*: used by both stages
       {"problem_id",         "INT",    "UNIQUE NOT NULL"}, //*
@@ -21,7 +25,6 @@ const DatabaseTable kProbSettingTable("problem_settings",
       {"evaluate_nonnormal", "BOOL",   "NOT NULL"},
       {"scoring_type",       "INT",    "NOT NULL"},        //*
       {"file_per_testdata",  "INT",    "NOT NULL"},
-      {"file_common_cnt",    "INT",    "NOT NULL"},        //*
       {"kill_old",           "BOOL",   "NOT NULL"},        //1-stage only
       {"timestamp",          "BIGINT", "NOT NULL"},
     }, {}, "PRIMARY KEY (problem_id)");
@@ -36,10 +39,20 @@ const DatabaseTable kProbExtraAttrTable("problem_extra_attr",
     "FOREIGN KEY (problem_id) REFERENCES problem_settings(problem_id)");
 const DatabaseTable kTestdataTable("testdata",
     {
-      {"problem_id",  "INT", "NOT NULL"},
-      {"testdata_id", "INT", "NOT NULL"},
-      {"file_id",     "INT", "NOT NULL"},
-      {"timestamp",   "DATETIME(3)", "NOT NULL"}
+      {"problem_id",  "INT",           "NOT NULL"},
+      {"testdata_id", "INT",           "NOT NULL"},
+      {"time_lim",    "BIGINT",        "NOT NULL"},
+      {"memory_lim",  "BIGINT",        "NOT NULL"},
+      {"args",        "VARCHAR(8192)", "NOT NULL"},
+    }, {{"problem_id"}, {"problem_id", "testdata_id"}},
+    "PRIMARY KEY (problem_id, testdata_id), "
+    "FOREIGN KEY (problem_id) REFERENCES problem_settings(problem_id)");
+const DatabaseTable kFileTimestampTable("file_timestamp",
+    {
+      {"problem_id",  "INT",    "NOT NULL"},
+      {"testdata_id", "INT",    "NOT NULL"}, // -1 for common file
+      {"file_id",     "INT",    "NOT NULL"},
+      {"timestamp",   "BIGINT", "NOT NULL"}
     }, {{"problem_id"}, {"problem_id", "testdata_id"}},
     "PRIMARY KEY (problem_id, testdata_id, file_id), "
     "FOREIGN KEY (problem_id) REFERENCES problem_settings(problem_id)");
@@ -88,39 +101,7 @@ const DatabaseTable kTestdataResultTable("testdata_results",
     "PRIMARY KEY (submission_id, testdata_id), "
     "FOREIGN KEY (submission_id) REFERENCES submissions(submission_id)");
 
-// Some default constuctors
-ProblemSettings::CompileSettings::CompileSettings() :
-    lang(kLangNull), args() {}
-ProblemSettings::CustomLanguage::CustomLanguage() :
-    compile(), tl_a(1.), tl_b(0.), ml_a(1.), ml_b(0.), syscall_adj() {}
-ProblemSettings::ResultColumn::ResultColumn() :
-    type(ProblemSettings::ResultColumn::kScoreFloat), visible(true) {}
-ProblemSettings::FileInSandbox::FileInSandbox() :
-    id(0), stages{0, 1, 0, 0}, path() {}
-
-// Default problem settings
-ProblemSettings::ProblemSettings() :
-    problem_id(0),
-    is_one_stage(false), // 4-stage mode
-    code_check_compile(), // no code checking
-    custom_lang(), // not used
-    execution_type(ProblemSettings::kExecNormal), // batch judge
-    execution_times(1), // not used
-    lib_name(), lib_compile(), // not used
-    pipe_in(false), pipe_out(false), // read from file
-    partial_judge(false), // judge whole problem
-    evaluation_type(ProblemSettings::kEvalNormal), // normal judge
-    evaluation_format(ProblemSettings::kEvalFormatZero), // not used
-    password(0),
-    evaluation_compile(), // not used
-    evaluation_columns(), // no additional columns
-    evaluate_nonnormal(false),
-    scoring_type(ProblemSettings::kScoringNormal), // normal scoring
-    file_per_testdata(2), file_common_cnt(0), // no additional files
-    testdata_file_path(), common_file_path(),
-    kill_old(false), // not used
-    // custom_stage(),
-    timestamp(0) {}
+// ----- General -----
 
 // QUESTION: Should sess be global?
 void InitMySQLSession(MySQLSession& sess, bool check) {
@@ -151,6 +132,7 @@ void InitMySQLSession(MySQLSession& sess, bool check) {
     CheckTable(kProbSettingTable);
     CheckTable(kProbExtraAttrTable);
     CheckTable(kTestdataTable);
+    CheckTable(kFileTimestampTable);
     CheckTable(kRangeTable);
     CheckTable(kRangeMappingTable);
     CheckTable(kSubmissionTable);
@@ -164,6 +146,93 @@ void InitMySQLSession(MySQLSession& sess, bool check) {
   }
 }
 
+// ----- Problem settings -----
+
+// class ScoreInt
+const int ScoreInt::kBase = 1000000;
+
+ScoreInt::ScoreInt() : val_(0) {}
+ScoreInt::ScoreInt(double a) : val_(llround(a * kBase)) {}
+ScoreInt::ScoreInt(long double a) : val_(llroundl(a * kBase)) {}
+ScoreInt::ScoreInt(int64_t a) : val_(a) {}
+
+ScoreInt& ScoreInt::operator=(double a) {
+  val_ = llround(a * kBase);
+  return *this;
+}
+
+ScoreInt& ScoreInt::operator=(long double a) {
+  val_ = llroundl(a * kBase);
+  return *this;
+}
+
+ScoreInt& ScoreInt::operator=(int64_t a) {
+  val_ = a;
+  return *this;
+}
+
+ScoreInt& ScoreInt::operator+=(const ScoreInt& a) {
+  val_ += a.val_;
+  return *this;
+}
+
+ScoreInt& ScoreInt::operator*=(const ScoreInt& a) {
+  val_ = static_cast<long double>(val_) / kBase * a.val_;
+  return *this;
+}
+
+ScoreInt::operator long double() {
+  return static_cast<long double>(val_) / kBase;
+}
+
+ScoreInt operator+(ScoreInt a, const ScoreInt& b) {
+  a += b;
+  return a;
+}
+
+ScoreInt operator*(ScoreInt a, const ScoreInt& b) {
+  a += b;
+  return a;
+}
+
+// Some default constuctors
+ProblemSettings::CompileSettings::CompileSettings() :
+    lang(kLangNull), args() {}
+ProblemSettings::CustomLanguage::CustomLanguage() :
+    compile(), as_interpreter(false), tl_a(1.), tl_b(0.), ml_a(1.), ml_b(0.),
+    syscall_adj() {}
+ProblemSettings::ResultColumn::ResultColumn() :
+    type(ProblemSettings::ResultColumn::kScoreFloat), visible(true) {}
+ProblemSettings::TestdataFile::TestdataFile() :
+    id(0), path() {}
+ProblemSettings::CommonFile::CommonFile() :
+    usage(ProblemSettings::CommonFile::kLib), lib_lang(kLangNull), id(0),
+    stages{0, 0, 0, 0}, file_id(0), path() {}
+
+// Default problem settings
+ProblemSettings::ProblemSettings() :
+    problem_id(0),
+    is_one_stage(false), // 4-stage mode
+    code_check_compile(), // no code checking
+    custom_lang(), // not used
+    execution_type(ProblemSettings::kExecNormal), // batch judge
+    execution_times(1), // not used
+    lib_compile(), // not used
+    pipe_in(false), pipe_out(false), // read from file
+    partial_judge(false), // judge whole problem
+    evaluation_type(ProblemSettings::kEvalNormal), // normal judge
+    evaluation_format(ProblemSettings::kEvalFormatZero), // not used
+    password(0),
+    evaluation_compile(), // not used
+    evaluation_columns(), // no additional columns
+    evaluate_nonnormal(false),
+    scoring_type(ProblemSettings::kScoringNormal), // normal scoring
+    file_per_testdata(2), // no additional files
+    testdata_files(), common_files(),
+    kill_old(false), // not used
+    // custom_stage(),
+    timestamp(0) {}
+
 long long GetProblemTimestamp(MySQLSession& sess, int id) {
   auto res = sess.sql("SELECT timestamp FROM problem_settings WHERE problem_id = ?;")
                   .bind(id).execute();
@@ -176,8 +245,6 @@ long long GetProblemTimestamp(MySQLSession& sess, int id) {
   }
   return static_cast<int64_t>(res.fetchOne()[0]);
 }
-
-// TODO: ProblemSettings check
 
 struct AttrEntry {
   enum AttrType {
@@ -209,7 +276,7 @@ ProblemSettings::CompileSettings ParseCompileSettings(Iter first, Iter last) {
   return s;
 }
 
-ProblemSettings::ResultColumn ParseColumn(const std::vector<std::string>& vec) {
+ProblemSettings::ResultColumn ParseColumn(const StrVec& vec) {
   ProblemSettings::ResultColumn s;
   s.type = static_cast<ProblemSettings::ResultColumn::ColumnType>(
       std::stoi(vec[0]));
@@ -245,9 +312,8 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
   ps.evaluate_nonnormal = Get(10);
   ps.scoring_type = static_cast<ProblemSettings::ScoringType>(Get(11));
   ps.file_per_testdata = Get(12);
-  ps.file_common_cnt = Get(13);
-  ps.kill_old = Get(14);
-  ps.timestamp = static_cast<int64_t>(Get(15));
+  ps.kill_old = Get(13);
+  ps.timestamp = static_cast<int64_t>(Get(14));
 
   raw = sess.sql("SELECT * FROM problem_extra_attr WHERE problem_id = ? "
                  "ORDER BY type_id, item_id").bind(id).execute();
@@ -255,7 +321,8 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
     res = raw.fetchOne();
     AttrEntry::AttrType type = static_cast<AttrEntry::AttrType>(Get(1));
     int item_id = Get(2);
-    std::vector<std::string> cont = SplitString(res[3]);
+    std::string str = res[3];
+    StrVec cont = SplitString(str);
     switch (type) {
       case AttrEntry::kCodeCheckOption: {
         ps.code_check_compile = ParseCompileSettings(cont.begin(), cont.end());
@@ -263,16 +330,17 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
       }
       case AttrEntry::kCustomLangSettings: {
         ProblemSettings::CustomLanguage s;
-        s.tl_a = std::stod(cont[0]);
-        s.tl_b = std::stod(cont[1]);
-        s.ml_a = std::stod(cont[2]);
-        s.ml_b = std::stod(cont[3]);
-        size_t sysadjcnt = std::stoi(cont[4]);
+        s.as_interpreter = cont[0] == "1";
+        s.tl_a = std::stod(cont[1]);
+        s.tl_b = std::stod(cont[2]);
+        s.ml_a = std::stod(cont[3]);
+        s.ml_b = std::stod(cont[4]);
+        size_t sysadjcnt = std::stoi(cont[5]);
         for (size_t i = 0; i < sysadjcnt; i++) {
-          auto& cur = cont[i + 5];
+          auto& cur = cont[i + 6];
           s.syscall_adj.emplace_back(cur.substr(1), cur[0] == '-');
         }
-        s.compile = ParseCompileSettings(cont.begin() + (sysadjcnt + 5),
+        s.compile = ParseCompileSettings(cont.begin() + (sysadjcnt + 6),
             cont.end());
         ps.custom_lang.push_back(s);
         break;
@@ -281,14 +349,9 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
         switch (ps.execution_type) {
           case ProblemSettings::kExecNormal: break;
           case ProblemSettings::kExecOldInteractive: // fall through
-          case ProblemSettings::kExecInteractive: {
-            ps.execution_times = std::stoi(cont[0]);
-            ps.lib_name.push_back(cont[1]);
-            break;
-          }
+          case ProblemSettings::kExecInteractive:    // fall through
           case ProblemSettings::kExecMultiPhaseSeparated: {
-            if (item_id == -1) ps.execution_times = std::stoi(cont[0]);
-            else ps.lib_name.push_back(cont[0]);
+            ps.execution_times = std::stoi(str);
             break;
           }
           case ProblemSettings::kExecCFInteractive: // fall through
@@ -316,19 +379,22 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
         break;
       }
       case AttrEntry::kTestdataFile: {
-        ProblemSettings::FileInSandbox f;
+        ProblemSettings::TestdataFile f;
         f.id = item_id;
-        for (int i = 0; i < 4; i++) f.stages[i] = cont[i] == "1";
-        f.path = cont[4];
-        ps.testdata_file_path.push_back(f);
+        f.path = str;
+        ps.testdata_files.push_back(f);
         break;
       }
       case AttrEntry::kCommonFile: {
-        ProblemSettings::FileInSandbox f;
-        f.id = item_id;
-        for (int i = 0; i < 4; i++) f.stages[i] = cont[i] == "1";
-        f.path = cont[4];
-        ps.common_file_path.push_back(f);
+        ProblemSettings::CommonFile f;
+        f.usage = static_cast<decltype(f.usage)>(std::stoi(cont[0]));
+        f.lib_lang = static_cast<Language>(std::stoi(cont[1]));
+        f.id = std::stoi(cont[2]);
+        int tmp = std::stoi(cont[3]);
+        for (int i = 0; i < 4; i++) f.stages[i] = (tmp & 1 << i);
+        f.file_id = std::stoi(cont[4]);
+        f.path = cont[5];
+        ps.common_files.push_back(f);
         break;
       }
       case AttrEntry::kCustomStage: {
@@ -338,6 +404,7 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
       }
     }
   }
+  // TODO: testdata & range
   return ps;
 }
 
@@ -360,9 +427,10 @@ std::string CompileSettingsToStr(const ProblemSettings::CompileSettings& s) {
 }
 
 std::string CustomLanguageToStr(const ProblemSettings::CustomLanguage& s) {
-  return MergeString(MergeString(
+  return MergeString(MergeString(MergeString(
+      std::string(s.as_interpreter ? "1" : "0"),
       MergeString(std::vector<double>({ // TL / ML adjustments
-        s.tl_a, s.tl_b, s.ml_a, s.ml_b}), DoubleToStr),
+        s.tl_a, s.tl_b, s.ml_a, s.ml_b}), DoubleToStr)),
       std::to_string(s.syscall_adj.size())), MergeString( // syscall adjustments
       MergeString(s.syscall_adj, [](const std::pair<std::string, bool>& a) {
         return (a.second ? "-" : "+") + a.first;
@@ -370,9 +438,17 @@ std::string CustomLanguageToStr(const ProblemSettings::CustomLanguage& s) {
       CompileSettingsToStr(s.compile))); // compile settings
 }
 
-std::string FileInSandboxToStr(const ProblemSettings::FileInSandbox& s) {
-  std::vector<std::string> vec;
-  for (int i = 0; i < 4; i++) vec.push_back(s.stages[i] ? "1" : "0");
+std::string CommonFileToStr(const ProblemSettings::CommonFile& s) {
+  StrVec vec;
+  vec.push_back(std::to_string(static_cast<int>(s.usage)));
+  vec.push_back(std::to_string(static_cast<int>(s.lib_lang)));
+  vec.push_back(std::to_string(s.id));
+  int tmp = 0;
+  for (int i = 0; i < 4; i++) {
+    if (s.stages[i]) tmp |= 1 << i;
+  }
+  vec.push_back(std::to_string(tmp));
+  vec.push_back(std::to_string(s.file_id));
   vec.push_back(s.path);
   return MergeString(vec);
 }
@@ -398,17 +474,10 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
   switch (ps.execution_type) {
     case ProblemSettings::kExecNormal: break;
     case ProblemSettings::kExecOldInteractive: // fall through
-    case ProblemSettings::kExecInteractive: {
-      opts.emplace_back(AttrEntry::kExecSettings, 0,
-          MergeString(std::to_string(ps.execution_times), ps.lib_name[0]));
-      break;
-    }
+    case ProblemSettings::kExecInteractive:    // fall through
     case ProblemSettings::kExecMultiPhaseSeparated: {
-      opts.emplace_back(AttrEntry::kExecSettings, -1,
+      opts.emplace_back(AttrEntry::kExecSettings, 0,
           std::to_string(ps.execution_times));
-      for (int cnt = 0; cnt < ps.execution_times; cnt++) {
-        opts.emplace_back(AttrEntry::kExecSettings, cnt, ps.lib_name[cnt]);
-      }
       break;
     }
     case ProblemSettings::kExecCFInteractive: // fall through
@@ -439,11 +508,12 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
         ColumnToStr(ps.scoring_columns[i]));
   }
   // TestdataFile, CommonFile
-  for (const ProblemSettings::FileInSandbox& f : ps.testdata_file_path) {
-    opts.emplace_back(AttrEntry::kTestdataFile, f.id, FileInSandboxToStr(f));
+  for (const ProblemSettings::TestdataFile& f : ps.testdata_files) {
+    opts.emplace_back(AttrEntry::kTestdataFile, f.id, f.path);
   }
-  for (const ProblemSettings::FileInSandbox& f : ps.common_file_path) {
-    opts.emplace_back(AttrEntry::kCommonFile, f.id, FileInSandboxToStr(f));
+  for (size_t i = 0; i < ps.common_files.size(); i++) {
+    opts.emplace_back(AttrEntry::kCommonFile, i,
+        CommonFileToStr(ps.common_files[i]));
   }
   // CustomStage
   for (const auto& p : ps.custom_stage) {
@@ -461,15 +531,15 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
         "is_one_stage = ?, check_code = ?, execution_type = ?, "
         "pipe_in = ?, pipe_out = ?, partial_judge = ?, evaluation_type = ?, "
         "evaluation_format = ?, password = ?, evaluate_nonnormal = ?, "
-        "scoring_type = ?, file_per_testdata = ?, file_common_cnt = ?, "
+        "scoring_type = ?, file_per_testdata = ?, "
         "kill_old = ?, timestamp = ? WHERE problem_id = ?;");
   } else {
     query = sess.sql("INSERT INTO problem_settings ("
         "is_one_stage, check_code, execution_type, pipe_in, pipe_out, "
         "partial_judge, evaluation_type, evaluation_format, password, "
-        "evaluate_nonnormal, scoring_type, file_per_testdata, file_common_cnt, "
+        "evaluate_nonnormal, scoring_type, file_per_testdata, "
         "kill_old, timestamp, problem_id) VALUES "
-        "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+        "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
   }
   query.bind(static_cast<int>(ps.is_one_stage),
              static_cast<int>(ps.code_check_compile.lang != kLangNull),
@@ -483,7 +553,6 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
              static_cast<int>(ps.evaluate_nonnormal),
              static_cast<int>(ps.scoring_type),
              ps.file_per_testdata,
-             ps.file_common_cnt,
              static_cast<int>(ps.kill_old),
              static_cast<int64_t>(ps.timestamp),
              ps.problem_id).execute();
@@ -492,4 +561,7 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
         .bind(ps.problem_id, static_cast<int>(attr.type),
               attr.item_id, attr.text).execute();
   }
+
+  // TODO: testdata & range
 }
+

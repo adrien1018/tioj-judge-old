@@ -21,17 +21,26 @@ enum Language {
 };
 
 // used in judging
-enum DefaultLanguage {
-  kDefLangC11     = 1,
-  kDefLangC99     = 2,
-  kDefLangC90     = 3,
-  kDefLangCpp17   = 4,
-  kDefLangCpp14   = 5,
-  kDefLangCpp11   = 6,
-  kDefLangCpp98   = 7,
-  kDefLangPython2 = 8,
-  kDefLangPython3 = 9,
-  kDefLangHaskell = 10
+struct JudgeLanguage {
+  enum DefaultLanguage {
+    kDefLangNull    = 0,
+    kDefLangC11     = 1,
+    kDefLangC99     = 2,
+    kDefLangC90     = 3,
+    kDefLangCpp17   = 4,
+    kDefLangCpp14   = 5,
+    kDefLangCpp11   = 6,
+    kDefLangCpp98   = 7,
+    kDefLangPython2 = 8,
+    kDefLangPython3 = 9,
+    kDefLangHaskell = 10,
+    kCustomLang     = 255,
+  } lang;
+  int custom_lang_id;
+  JudgeLanguage() : lang(kDefLangCpp11), custom_lang_id(0) {}
+  bool operator==(const JudgeLanguage& a) const {
+    return lang == a.lang && custom_lang_id == a.custom_lang_id;
+  }
 };
 
 // First work on these languages, and add more when the details are finished

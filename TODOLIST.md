@@ -3,3 +3,4 @@
  - [ ] Revise communicator structure (change to single thread)
  - [ ] Scheduling policy
  - [ ] Revise README
+ - [ ] Support of testdata generation & verification

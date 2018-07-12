@@ -8,11 +8,46 @@
 #include "config.h"
 #include "mysql_helper.h"
 
+// ----- General -----
+
+// Initialize an MySQLSession and perform database/table check (if true)
+void InitMySQLSession(MySQLSession&, bool check = true);
+
+// ----- Problem settings -----
+
 class Arguments : public std::vector<std::string> {
   using std::vector<std::string>::vector;
 };
 
-// structure of problem setting
+// Fixed-point decimal value to represent score
+class ScoreInt {
+ private:
+  long long val_;
+ public:
+  static const int kBase;
+
+  ScoreInt();
+  ScoreInt(double);
+  ScoreInt(long double);
+  ScoreInt(int64_t); // direct conversion, not by value
+
+  ScoreInt& operator=(double);
+  ScoreInt& operator=(long double);
+  ScoreInt& operator=(int64_t);
+
+  ScoreInt& operator+=(const ScoreInt&);
+  ScoreInt& operator*=(const ScoreInt&);
+
+  operator long double();
+
+  friend ScoreInt operator+(ScoreInt, const ScoreInt&);
+  friend ScoreInt operator*(ScoreInt, const ScoreInt&);
+};
+
+ScoreInt operator+(ScoreInt, const ScoreInt&);
+ScoreInt operator*(ScoreInt, const ScoreInt&);
+
+// structure of problem settings
 struct ProblemSettings {
   struct CompileSettings {
     Language lang;
@@ -30,6 +65,11 @@ struct ProblemSettings {
 
   struct CustomLanguage {
     CompileSettings compile;
+    // if true, an additional common file is provided.
+    //  It (instead of submitted code) will be compiled as interpreter
+    //  and used in the execution stage.
+    //  (submitted file will be passed as an argument)
+    bool as_interpreter;
     double tl_a, tl_b, ml_a, ml_b; // TL & ML adjustments
     // syscall adjustments; true for blacklist
     std::vector<std::pair<std::string, bool>> syscall_adj;
@@ -49,10 +89,6 @@ struct ProblemSettings {
 
   // times of execution (N), used by (old/new)interactive and multiphase
   int execution_times;
-
-  // lib filename in each stage, length = N if multiphase,
-  //  length = 1 if (old/new)interactive, 0 otherwise
-  std::vector<std::string> lib_name;
 
   // compile settings of lib file
   // used by output only and CF interactive
@@ -112,29 +148,70 @@ struct ProblemSettings {
     kScoringSpecial = 3
   } scoring_type;
   // compilation settings of evaluation program
-  // also used by 1-stage mode
+  //  also used by 1-stage mode
   CompileSettings scoring_compile;
   std::vector<ResultColumn> scoring_columns;
 
   // file count per testdata (usually 2: input and output)
-  // common file count (lib excluded, usually 0)
-  int file_per_testdata, file_common_cnt;
+  int file_per_testdata;
 
-  struct FileInSandbox {
+  struct TestdataFile {
     int id;
-    bool stages[4];
     // path of file in sandbox
     std::string path;
-    FileInSandbox();
+    TestdataFile();
+  }; // these files will appear in both exec and eval stage
+  std::vector<TestdataFile> testdata_files;
+
+  struct CommonFile {
+    enum Usage {
+      kLib = 1,
+      kIntepreter = 2,
+      kCustomStage = 3,
+      kOther = 4
+    } usage;
+    // used only if usage == kLib
+    Language lib_lang;
+    // if usage == kLib, it is stage number (for multiphase separated)
+    // if usage == kIntepreter, it is custom language ID
+    // if usage == kCustomStage, it is stage ID
+    int id;
+    // used only if usage == kOther
+    bool stages[4];
+    int file_id;
+    // used only if (usage == kLib and not CFinteractive/Outputonly)
+    //  or usage == kOther
+    std::string path;
+    CommonFile();
   };
-  std::vector<FileInSandbox> testdata_file_path, common_file_path;
+  std::vector<CommonFile> common_files;
 
   // used by 1-stage mode only; if true, kill old execution when new
-  // judge request of the same problem arrived
+  //  judge request of the same problem arrived
   bool kill_old;
 
   // fully-customized stage
   std::vector<std::pair<int, CompileSettings>> custom_stage;
+
+  struct Testdata {
+    long long time_lim, memory_lim; // us, KB
+    // Additional args when executing
+    Arguments args;
+    // Length = file_per_testdata; all files in a problem are uniquely numbered,
+    //  to avoid retransmission and for convenience of reordering testdata
+    std::vector<int> file_id;
+    Testdata();
+  };
+  std::vector<Testdata> testdata;
+
+  // score ranges
+  struct ScoreRange {
+    ScoreInt score;
+    // testdata in this range
+    std::vector<int> testdata;
+    ScoreRange();
+  };
+  std::vector<ScoreRange> ranges;
 
   // TODO: Change to event counter (web server should be modified)
   long long timestamp;
@@ -142,14 +219,12 @@ struct ProblemSettings {
   ProblemSettings();
 };
 
-// Initialize an MySQLSession and perform database/table check (if true)
-void InitMySQLSession(MySQLSession&, bool check = true);
-
 // Get timestamp of a problem; if not exist, throw invalid_argument
 long long GetProblemTimestamp(MySQLSession&, int);
 
+// QUESTION: Is this necessary?
 // Check if settings is valid
-bool IsValidProblemSettings(const ProblemSettings&);
+// bool IsValidProblemSettings(const ProblemSettings&);
 
 // Get settings of a problem; if not exist, throw invalid_argument
 ProblemSettings GetProblemSettings(MySQLSession&, int);
