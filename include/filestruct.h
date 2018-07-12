@@ -133,8 +133,8 @@ struct ProblemSettings {
   // judge request of the same problem arrived
   bool kill_old;
 
-  // TODO: Sandbox settings struct
-  // std::vector<std::pair<int, SandboxSettings>> custom_stage;
+  // fully-customized stage
+  std::vector<std::pair<int, CompileSettings>> custom_stage;
 
   // TODO: Change to event counter (web server should be modified)
   long long timestamp;

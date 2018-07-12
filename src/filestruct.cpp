@@ -177,7 +177,7 @@ long long GetProblemTimestamp(MySQLSession& sess, int id) {
   return static_cast<int64_t>(res.fetchOne()[0]);
 }
 
-//
+// TODO: ProblemSettings check
 
 struct AttrEntry {
   enum AttrType {
@@ -332,7 +332,9 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
         break;
       }
       case AttrEntry::kCustomStage: {
-        // TODO
+        ps.custom_stage.emplace_back(item_id,
+            ParseCompileSettings(cont.begin(), cont.end()));
+        break;
       }
     }
   }
@@ -443,7 +445,11 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
   for (const ProblemSettings::FileInSandbox& f : ps.common_file_path) {
     opts.emplace_back(AttrEntry::kCommonFile, f.id, FileInSandboxToStr(f));
   }
-  // TODO: SandboxSettings
+  // CustomStage
+  for (const auto& p : ps.custom_stage) {
+    opts.emplace_back(AttrEntry::kCustomStage, p.first,
+        CompileSettingsToStr(p.second));
+  }
 
   // SqlStatement have no default constuctor...
   mysqlx::SqlStatement query(sess.sql(""));

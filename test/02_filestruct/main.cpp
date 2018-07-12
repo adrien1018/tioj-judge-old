@@ -231,6 +231,13 @@ TEST_F(ProbSettingsRWTest, FileInSandbox) {
   CHECK;
 }
 
+TEST_F(ProbSettingsRWTest, CustomStage) {
+  prob.custom_stage.emplace_back(1, comp);
+  CHECK;
+  prob.custom_stage.emplace_back(2, comp);
+  CHECK;
+}
+
 TEST(GetProblemTimestampTest, Main) {
   // now problem_settings are empty
   EXPECT_THROW(GetProblemTimestamp(sess, 1001), std::invalid_argument);
