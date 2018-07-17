@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include "filestruct.h"
+#include "database.h"
 
 const std::string kDatabaseName = "tioj_judge_test";
 const std::string kMySQLPassword = "tioj_test";
@@ -15,6 +15,9 @@ MySQLSession sess;
 
 #define SAME(X) bool operator==(const X& a, const X& b)
 #define CHK(x) (!(a.x == b.x) ? std::cerr << #x << std::endl, false : true)
+SAME(ScoreInt) {
+  return static_cast<int64_t>(a) == static_cast<int64_t>(b);
+}
 SAME(ProblemSettings::CompileSettings) {
   return CHK(lang) && CHK(args);
 }
@@ -33,6 +36,12 @@ SAME(ProblemSettings::CommonFile) {
          CHK(stages[1]) && CHK(stages[2]) && CHK(stages[3]) && CHK(file_id) &&
          CHK(path);
 }
+SAME(ProblemSettings::Testdata) {
+  return CHK(time_lim) && CHK(memory_lim) && CHK(args) && CHK(file_id);
+}
+SAME(ProblemSettings::ScoreRange) {
+  return CHK(score) && CHK(testdata);
+}
 SAME(ProblemSettings) {
   return CHK(problem_id) && CHK(is_one_stage) && CHK(code_check_compile) &&
          CHK(custom_lang) && CHK(execution_type) && CHK(execution_times) &&
@@ -42,7 +51,7 @@ SAME(ProblemSettings) {
          CHK(evaluate_nonnormal) && CHK(scoring_type) && CHK(scoring_compile) &&
          CHK(scoring_columns) && CHK(file_per_testdata) &&
          CHK(testdata_files) && CHK(common_files) && CHK(kill_old) &&
-         CHK(custom_stage) && CHK(timestamp);
+         CHK(custom_stage) && CHK(testdata) && CHK(ranges) && CHK(timestamp);
 }
 
 namespace {
@@ -111,9 +120,26 @@ class ProbSettingsRWTest : public ::testing::Test {
     cols.resize(3);
     cols[2].type = ProblemSettings::ResultColumn::kScoreFloat;
     cols[2].visible = false;
+
+    ProblemSettings::Testdata test;
+    test.file_id = {2, 4};
+    test.args = {"--testargs", "-t"};
+    prob.testdata.push_back(test);
+    test.file_id = {3, 5};
+    prob.testdata.push_back(test);
+    ProblemSettings::ScoreRange range;
+    range.score = 1.0;
+    range.testdata = {0};
+    prob.ranges.push_back(range);
+    range.score = 12.335;
+    range.testdata = {0, 1};
+    prob.ranges.push_back(range);
   }
   virtual void TearDown() {
     sess.sql("DELETE FROM problem_extra_attr;").execute();
+    sess.sql("DELETE FROM range_mapping;").execute();
+    sess.sql("DELETE FROM testdata;").execute();
+    sess.sql("DELETE FROM ranges;").execute();
     sess.sql("DELETE FROM problem_settings;").execute();
   }
 
@@ -151,6 +177,7 @@ TEST_F(ProbSettingsRWTest, CustomLang) {
   lang.tl_b = 0; lang.syscall_adj.clear();
   prob.custom_lang.push_back(lang);
   CHECK;
+  // TODO: CustomLang with interpreter
 }
 
 TEST_F(ProbSettingsRWTest, ExecSettings) {

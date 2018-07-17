@@ -1,4 +1,4 @@
-#include "filestruct.h"
+#include "database.h"
 
 #include <cmath>
 #include <sstream>
@@ -43,6 +43,7 @@ const DatabaseTable kTestdataTable("testdata",
       {"testdata_id", "INT",           "NOT NULL"},
       {"time_lim",    "BIGINT",        "NOT NULL"},
       {"memory_lim",  "BIGINT",        "NOT NULL"},
+      {"files",       "VARCHAR(1024)", "NOT NULL"}, // file id
       {"args",        "VARCHAR(8192)", "NOT NULL"},
     }, {{"problem_id"}, {"problem_id", "testdata_id"}},
     "PRIMARY KEY (problem_id, testdata_id), "
@@ -50,11 +51,10 @@ const DatabaseTable kTestdataTable("testdata",
 const DatabaseTable kFileTimestampTable("file_timestamp",
     {
       {"problem_id",  "INT",    "NOT NULL"},
-      {"testdata_id", "INT",    "NOT NULL"}, // -1 for common file
       {"file_id",     "INT",    "NOT NULL"},
       {"timestamp",   "BIGINT", "NOT NULL"}
-    }, {{"problem_id"}, {"problem_id", "testdata_id"}},
-    "PRIMARY KEY (problem_id, testdata_id, file_id), "
+    }, {{"problem_id"}},
+    "PRIMARY KEY (problem_id, file_id), "
     "FOREIGN KEY (problem_id) REFERENCES problem_settings(problem_id)");
 const DatabaseTable kRangeTable("ranges",
     {
@@ -68,8 +68,8 @@ const DatabaseTable kRangeMappingTable("range_mapping",
     {
       {"problem_id",  "INT", "NOT NULL"},
       {"testdata_id", "INT", "NOT NULL"},
-      {"range_id",    "INT", "NOT NULL"}, // index necessary???
-    }, {{"problem_id"}, {"problem_id", "range_id"}, {"problem_id", "testdata_id"}},
+      {"range_id",    "INT", "NOT NULL"},
+    }, {{"problem_id"}},
     "FOREIGN KEY (problem_id, testdata_id) REFERENCES testdata(problem_id, testdata_id), "
     "FOREIGN KEY (problem_id, range_id) REFERENCES ranges(problem_id, range_id)");
 const DatabaseTable kSubmissionTable("submissions",
@@ -181,8 +181,12 @@ ScoreInt& ScoreInt::operator*=(const ScoreInt& a) {
   return *this;
 }
 
-ScoreInt::operator long double() {
+ScoreInt::operator long double() const {
   return static_cast<long double>(val_) / kBase;
+}
+
+ScoreInt::operator int64_t() const {
+  return static_cast<int64_t>(val_);
 }
 
 ScoreInt operator+(ScoreInt a, const ScoreInt& b) {
@@ -208,6 +212,10 @@ ProblemSettings::TestdataFile::TestdataFile() :
 ProblemSettings::CommonFile::CommonFile() :
     usage(ProblemSettings::CommonFile::kLib), lib_lang(kLangNull), id(0),
     stages{0, 0, 0, 0}, file_id(0), path() {}
+ProblemSettings::Testdata::Testdata() :
+    time_lim(1000000), memory_lim(262144), file_id(), args() {}
+ProblemSettings::ScoreRange::ScoreRange() :
+    score(), testdata() {}
 
 // Default problem settings
 ProblemSettings::ProblemSettings() :
@@ -342,7 +350,7 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
         }
         s.compile = ParseCompileSettings(cont.begin() + (sysadjcnt + 6),
             cont.end());
-        ps.custom_lang.push_back(s);
+        ps.custom_lang.push_back(std::move(s));
         break;
       }
       case AttrEntry::kExecSettings: {
@@ -382,7 +390,7 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
         ProblemSettings::TestdataFile f;
         f.id = item_id;
         f.path = str;
-        ps.testdata_files.push_back(f);
+        ps.testdata_files.push_back(std::move(f));
         break;
       }
       case AttrEntry::kCommonFile: {
@@ -394,7 +402,7 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
         for (int i = 0; i < 4; i++) f.stages[i] = (tmp & 1 << i);
         f.file_id = std::stoi(cont[4]);
         f.path = cont[5];
-        ps.common_files.push_back(f);
+        ps.common_files.push_back(std::move(f));
         break;
       }
       case AttrEntry::kCustomStage: {
@@ -404,7 +412,33 @@ ProblemSettings GetProblemSettings(MySQLSession& sess, int id) {
       }
     }
   }
-  // TODO: testdata & range
+  raw = sess.sql("SELECT * FROM testdata WHERE problem_id = ? "
+                 "ORDER BY testdata_id").bind(id).execute();
+  for (; raw.count() != 0;) {
+    res = raw.fetchOne();
+    ProblemSettings::Testdata t;
+    t.time_lim = static_cast<int64_t>(res[2]);
+    t.memory_lim = static_cast<int64_t>(res[3]);
+    StrVec ids = SplitString(res[4]);
+    for (const std::string& str : ids) t.file_id.push_back(std::stoi(str));
+    t.args = SplitString(res[5]);
+    ps.testdata.push_back(std::move(t));
+  }
+  raw = sess.sql("SELECT * FROM ranges WHERE problem_id = ? "
+                 "ORDER BY range_id").bind(id).execute();
+  ps.ranges.resize(raw.count());
+  for (int i = 0; raw.count() != 0; i++) {
+    res = raw.fetchOne();
+    ps.ranges[i].score = static_cast<int64_t>(res[2]);
+  }
+  raw = sess.sql("SELECT * FROM range_mapping WHERE problem_id = ? "
+                 "ORDER BY testdata_id").bind(id).execute();
+  for (; raw.count() != 0;) {
+    res = raw.fetchOne();
+    ps.ranges[static_cast<int>(res[2])].testdata
+      .push_back(static_cast<int>(res[1]));
+  }
+
   return ps;
 }
 
@@ -524,8 +558,14 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
   // SqlStatement have no default constuctor...
   mysqlx::SqlStatement query(sess.sql(""));
   if (IsProbExist(sess, ps.problem_id)) {
-    // delete additional attr first
+    // delete additional attr and range mapping first because of foreign keys
+    sess.sql("DELETE FROM range_mapping WHERE problem_id = ?;")
+        .bind(ps.problem_id).execute();
     sess.sql("DELETE FROM problem_extra_attr WHERE problem_id = ?;")
+        .bind(ps.problem_id).execute();
+    sess.sql("DELETE FROM testdata WHERE problem_id = ?;")
+        .bind(ps.problem_id).execute();
+    sess.sql("DELETE FROM ranges WHERE problem_id = ?;")
         .bind(ps.problem_id).execute();
     query = sess.sql("UPDATE problem_settings SET "
         "is_one_stage = ?, check_code = ?, execution_type = ?, "
@@ -557,11 +597,31 @@ void UpdateProblemSettings(MySQLSession& sess, const ProblemSettings& ps) {
              static_cast<int64_t>(ps.timestamp),
              ps.problem_id).execute();
   for (const AttrEntry& attr : opts) {
-    sess.sql("INSERT INTO problem_extra_attr VALUES (?, ?, ?, ?)")
+    // prob-id, type, item, text
+    sess.sql("INSERT INTO problem_extra_attr VALUES (?, ?, ?, ?);")
         .bind(ps.problem_id, static_cast<int>(attr.type),
               attr.item_id, attr.text).execute();
   }
 
-  // TODO: testdata & range
+  for (size_t i = 0; i < ps.testdata.size(); i++) {
+    // prob-id, testdata-id, TL, ML, file-ids, args
+    sess.sql("INSERT INTO testdata VALUES (?, ?, ?, ?, ?, ?);")
+        .bind(ps.problem_id, i, ps.testdata[i].time_lim,
+              ps.testdata[i].memory_lim,
+              MergeString(ps.testdata[i].file_id,
+                  [](int i){return std::to_string(i);}),
+              MergeString(ps.testdata[i].args)).execute();
+  }
+  for (size_t i = 0; i < ps.ranges.size(); i++) {
+    // prob-id, range-id, score
+    sess.sql("INSERT INTO ranges VALUES (?, ?, ?);")
+        .bind(ps.problem_id, i, static_cast<int64_t>(ps.ranges[i].score))
+        .execute();
+    for (int testdata : ps.ranges[i].testdata) {
+      // prob-id, testdata, range
+      sess.sql("INSERT INTO range_mapping VALUES (?, ?, ?);")
+          .bind(ps.problem_id, testdata, i).execute();
+    }
+  }
 }
 

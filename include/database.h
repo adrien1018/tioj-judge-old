@@ -1,7 +1,7 @@
 #ifndef FILESTRUCT_H_
 #define FILESTRUCT_H_
 
-/// This header contains helper functions to maintain and read from judge file structures
+/// This header contains helper functions to maintain and read from judge database
 
 #include <vector>
 
@@ -16,7 +16,9 @@ void InitMySQLSession(MySQLSession&, bool check = true);
 // ----- Problem settings -----
 
 class Arguments : public std::vector<std::string> {
+public:
   using std::vector<std::string>::vector;
+  using std::vector<std::string>::operator=;
 };
 
 // Fixed-point decimal value to represent score
@@ -38,7 +40,8 @@ class ScoreInt {
   ScoreInt& operator+=(const ScoreInt&);
   ScoreInt& operator*=(const ScoreInt&);
 
-  operator long double();
+  operator long double() const;
+  operator int64_t() const;
 
   friend ScoreInt operator+(ScoreInt, const ScoreInt&);
   friend ScoreInt operator*(ScoreInt, const ScoreInt&);
@@ -195,11 +198,11 @@ struct ProblemSettings {
 
   struct Testdata {
     long long time_lim, memory_lim; // us, KB
-    // Additional args when executing
-    Arguments args;
     // Length = file_per_testdata; all files in a problem are uniquely numbered,
     //  to avoid retransmission and for convenience of reordering testdata
     std::vector<int> file_id;
+    // Additional args when executing
+    Arguments args;
     Testdata();
   };
   std::vector<Testdata> testdata;
@@ -207,7 +210,7 @@ struct ProblemSettings {
   // score ranges
   struct ScoreRange {
     ScoreInt score;
-    // testdata in this range
+    // testdata in this range, increasing
     std::vector<int> testdata;
     ScoreRange();
   };

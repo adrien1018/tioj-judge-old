@@ -4,7 +4,7 @@ CXXLIBS = -lmysqlcppconn8 -lgtest_main -lgtest -lpthread
 HEADERDIR = ../../include/
 SRCDIR = ../../src/
 
-OBJ = filestruct.o mysql_helper.o utils.o
+OBJ = database.o mysql_helper.o utils.o
 
 TARGET = main
 
