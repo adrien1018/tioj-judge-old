@@ -1,3 +1,9 @@
+#include <fcntl.h>
+#include <sys/un.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <cstdio>
 #include <set>
 #include <vector>
 #include <gtest/gtest.h>
@@ -6,22 +12,179 @@
 
 namespace {
 
-TEST(ValidNameTest, Length) {
-  EXPECT_TRUE(IsValidName("a"));
-  EXPECT_FALSE(IsValidName(""));
-  EXPECT_TRUE(IsValidName("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijkl"));
-  EXPECT_FALSE(IsValidName("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklm"));
+class Environment : public ::testing::Environment {
+ public:
+  virtual void SetUp() {
+    creat("test_regular", 0644);
+    mkdir("test_directory", 0755);
+    mkfifo("test_fifo", 0644);
+    symlink("test_regular", "test_symlink");
+    symlink("test_notexist", "test_dangling_symlink");
+    struct sockaddr_un namesock;
+    namesock.sun_family = AF_UNIX;
+    strcpy(namesock.sun_path, "test_socket");
+    int fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    bind(fd, (struct sockaddr*)&namesock, sizeof(struct sockaddr_un));
+    close(fd);
+  }
+  virtual void TearDown() {
+    unlink("test_regular");
+    unlink("test_fifo");
+    unlink("test_symlink");
+    unlink("test_dangling_symlink");
+    unlink("test_socket");
+    rmdir("test_directory");
+  }
+};
+
+TEST(FileExistsTest, Main) {
+  EXPECT_TRUE(FileExists("test_regular"));
+  EXPECT_TRUE(FileExists("test_directory"));
+  EXPECT_TRUE(FileExists("test_symlink"));
+  EXPECT_TRUE(FileExists("test_fifo"));
+  EXPECT_TRUE(FileExists("test_socket"));
+  EXPECT_TRUE(FileExists("/dev/zero"));
+  EXPECT_FALSE(FileExists("test_dangling_symlink"));
+  EXPECT_FALSE(FileExists("test_notexist"));
+  EXPECT_FALSE(FileExists(""));
 }
 
-TEST(ValidNameTest, Charset) {
-  EXPECT_FALSE(IsValidName("1a"));
-  EXPECT_FALSE(IsValidName("a-a"));
-  EXPECT_FALSE(IsValidName("a&a"));
-  EXPECT_FALSE(IsValidName("a)a"));
-  EXPECT_FALSE(IsValidName("喵"));
-  EXPECT_TRUE(IsValidName("____"));
-  EXPECT_TRUE(IsValidName("abcdefghijklmnopqrstuvwxyz_0123456789"));
-  EXPECT_TRUE(IsValidName("ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789"));
+TEST(RegularFileTest, Main) {
+  EXPECT_TRUE(IsRegularFile("test_regular"));
+  EXPECT_FALSE(IsRegularFile("test_directory"));
+  EXPECT_FALSE(IsRegularFile("test_symlink"));
+  EXPECT_FALSE(IsRegularFile("test_fifo"));
+  EXPECT_FALSE(IsRegularFile("test_socket"));
+  EXPECT_FALSE(IsRegularFile("/dev/zero"));
+  EXPECT_FALSE(IsRegularFile("test_dangling_symlink"));
+  EXPECT_THROW(IsRegularFile("test_notexist"), std::system_error);
+}
+
+TEST(DirectoryTest, Main) {
+  EXPECT_FALSE(IsDirectory("test_regular"));
+  EXPECT_TRUE(IsDirectory("test_directory"));
+  EXPECT_FALSE(IsDirectory("test_symlink"));
+  EXPECT_FALSE(IsDirectory("test_fifo"));
+  EXPECT_FALSE(IsDirectory("test_socket"));
+  EXPECT_FALSE(IsDirectory("/dev/zero"));
+  EXPECT_FALSE(IsDirectory("test_dangling_symlink"));
+  EXPECT_THROW(IsDirectory("test_notexist"), std::system_error);
+}
+
+TEST(ValidFilenameTest, Length) {
+  EXPECT_FALSE(IsValidFilename(""));
+  EXPECT_TRUE(IsValidFilename("a"));
+  EXPECT_TRUE(IsValidFilename(std::string(255, 'a')));
+  EXPECT_FALSE(IsValidFilename(std::string(256, 'a')));
+}
+
+TEST(ValidFilenameTest, Charset) {
+  std::string str;
+  for (int i = 1; i < 256; i++) {
+    if (i != (int)'/') str.push_back(i);
+  }
+  EXPECT_TRUE(IsValidFilename(str));
+  str[2] = 0;
+  EXPECT_FALSE(IsValidFilename(str));
+  str[2] = '/';
+  EXPECT_FALSE(IsValidFilename(str));
+  str[2] = '\\';
+  EXPECT_TRUE(IsValidFilename(str));
+}
+
+TEST(AbsolutePathTest, Main) {
+  EXPECT_TRUE(IsAbsolutePath("/bin"));
+  EXPECT_TRUE(IsAbsolutePath("/"));
+  EXPECT_TRUE(IsAbsolutePath("/bin/"));
+  EXPECT_FALSE(IsAbsolutePath("bin/"));
+  EXPECT_FALSE(IsAbsolutePath("bin"));
+}
+
+TEST(DownwardPathTest, Main) {
+  EXPECT_TRUE(IsDownwardPath("/usr/lib/"));
+  EXPECT_TRUE(IsDownwardPath("/"));
+  EXPECT_TRUE(IsDownwardPath("/usr/lib/libsvm.so"));
+  EXPECT_TRUE(IsDownwardPath("usr/lib/libsvm.so"));
+  EXPECT_TRUE(IsDownwardPath("usr/lib/"));
+  EXPECT_TRUE(IsDownwardPath("usr/lib/./."));
+  EXPECT_TRUE(IsDownwardPath("/./usr/lib/./."));
+  EXPECT_FALSE(IsDownwardPath("/./usr/lib/./.."));
+  EXPECT_FALSE(IsDownwardPath("/./usr/lib/../"));
+  EXPECT_FALSE(IsDownwardPath("/./usr/lib/../lib"));
+  EXPECT_FALSE(IsDownwardPath(".."));
+  EXPECT_FALSE(IsDownwardPath("../usr/lib/"));
+  EXPECT_FALSE(IsDownwardPath("../usr/lib"));
+}
+
+TEST(ConcatPathTest, Empty) {
+  EXPECT_EQ("/test", ConcatPath("/test", ""));
+  EXPECT_EQ("/test", ConcatPath("", "/test"));
+  EXPECT_EQ("test", ConcatPath("", "test"));
+  EXPECT_EQ("test", ConcatPath("test", ""));
+}
+
+TEST(ConcatPathTest, SecondAbsolute) {
+  EXPECT_EQ("/test", ConcatPath("/test/1/2/3/4", "/test"));
+  EXPECT_EQ("/1/2/3/4", ConcatPath("test", "/1/2/3/4"));
+}
+
+TEST(ConcatPathTest, Main) {
+  EXPECT_EQ("/test", ConcatPath("/", "test"));
+  EXPECT_EQ("/1/2/3/4", ConcatPath("/1/2", "3/4"));
+  EXPECT_EQ("/test/testp", ConcatPath("/test/", "testp"));
+  EXPECT_EQ("/test/testp/", ConcatPath("/test/", "testp/"));
+}
+
+TEST(RealPathTest, Main) {
+  char* ptr;
+  ptr = getcwd(nullptr, 0);
+  std::string now(ptr);
+  free(ptr);
+  EXPECT_EQ(ConcatPath(now, "test_regular"), RealPath("test_symlink"));
+  EXPECT_EQ(ConcatPath(now, "test_regular"), RealPath("test_regular"));
+  EXPECT_EQ(ConcatPath(now, "test_fifo"), RealPath("test_fifo"));
+  EXPECT_THROW(RealPath("test_dangling_symlink"), std::system_error);
+  EXPECT_THROW(RealPath("test_notexist"), std::system_error);
+}
+
+TEST(RemoveRecursiveTest, Main) {
+  mkdir("test1", 0755);
+  mkdir("test1/1", 0755);
+  mkdir("test1/2", 0755);
+  mkdir("test1/3", 0755);
+  mkdir("test1/2/1", 0755);
+  mkdir("test1/2/2", 0755);
+  mkdir("test1/2/qwercq qwer", 0755);
+  mkdir("test1/2/werv **ercw.,.", 0755);
+  mkdir("test1/2/werv **ercw.,./wervt", 0755);
+  creat("test1/1.1", 0644);
+  creat("test1/2/1.1", 0644);
+  creat("test1/2/1.2", 0644);
+  creat("test1/2/1.3", 0644);
+  creat("test1/2/1/1.1", 0644);
+  creat("test_rm", 0644);
+  EXPECT_NO_THROW(RemoveRecursive("test1/2/2"));
+  EXPECT_NO_THROW(RemoveRecursive("test1"));
+  EXPECT_NO_THROW(RemoveRecursive("test_rm"));
+}
+
+TEST(ValidDBNameTest, Length) {
+  EXPECT_FALSE(IsValidDBName(""));
+  EXPECT_TRUE(IsValidDBName("a"));
+  EXPECT_TRUE(IsValidDBName(std::string(64, 'a')));
+  EXPECT_FALSE(IsValidDBName(std::string(65, 'a')));
+}
+
+TEST(ValidDBNameTest, Charset) {
+  EXPECT_FALSE(IsValidDBName("1a"));
+  EXPECT_FALSE(IsValidDBName("a-a"));
+  EXPECT_FALSE(IsValidDBName("a&a"));
+  EXPECT_FALSE(IsValidDBName("a)a"));
+  EXPECT_FALSE(IsValidDBName("a).a"));
+  EXPECT_FALSE(IsValidDBName("喵"));
+  EXPECT_TRUE(IsValidDBName("____"));
+  EXPECT_TRUE(IsValidDBName("abcdefghijklmnopqrstuvwxyz_0123456789"));
+  EXPECT_TRUE(IsValidDBName("ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789"));
 }
 
 TEST(DateTimeStrTest, Main) {
@@ -81,5 +244,6 @@ TEST(MergeStringTest, Func) {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  ::testing::AddGlobalTestEnvironment(new Environment);
   return RUN_ALL_TESTS();
 }

@@ -91,10 +91,10 @@ DatabaseTable::DatabaseTable(std::string name, ILStr2_ col, ILStr2_ ind,
     std::string ad) : name_(name), columns_(col.begin(), col.end()),
         indices_(ind.begin(), ind.end()), additional_(ad) {
   std::invalid_argument err("Invalid table format");
-  if (!IsValidName(name_) || !columns_.size()) throw err;
+  if (!IsValidDBName(name_) || !columns_.size()) throw err;
   int cnt = 0;
   for (const Column& i : columns_) {
-    if (!IsValidName(i.name)) throw err;
+    if (!IsValidDBName(i.name)) throw err;
     auto it = column_mp_.insert({i.name, cnt++});
     if (!it.second) throw err;
   }

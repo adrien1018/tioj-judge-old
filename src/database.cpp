@@ -107,7 +107,7 @@ const DatabaseTable kTestdataResultTable("testdata_results",
 void InitMySQLSession(MySQLSession& sess, bool check) {
   using namespace mysqlx;
   using std::cout;
-  if (!IsValidName(kDatabaseName)) {
+  if (!IsValidDBName(kDatabaseName)) {
     cout << "Invalid database name: " << kDatabaseName << '\n';
     exit(1);
   }

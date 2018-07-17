@@ -3,11 +3,11 @@
 
 // This header defines helper functions for simplicity
 
-#include <iostream>
 #include <string>
 #include <vector>
 
 #ifdef DEBUG
+#include <iostream>
 #define _DEBUG1(x) std::cerr << x << std::endl;
 #define _DEBUG2(x, y) std::cerr << x << ": " << y << std::endl;
 #else
@@ -15,8 +15,25 @@
 #define _DEBUG2(x, y)
 #endif
 
+// File type checking
+bool FileExists(const std::string&);     // follows symlink
+bool IsDirectory(const std::string&);    // does not follow symlink
+bool IsRegularFile(const std::string&);  // does not follow symlink
+
+// Path checking & manipulating
+bool IsValidFilename(const std::string&);
+bool IsAbsolutePath(const std::string&);
+// Contains no ..
+bool IsDownwardPath(const std::string&);
+// Concat 2 paths; if path2 is absolute, path1 is ignored
+std::string ConcatPath(const std::string&, const std::string&);
+
+// File structure maintainance
+std::string RealPath(const std::string&);
+void RemoveRecursive(const std::string&);
+
 // Basic rule for MySQL database, table and column name
-bool IsValidName(const std::string&);
+bool IsValidDBName(const std::string&);
 
 // Convert raw timestamp value to string
 std::string DateTimeStr(long long);
