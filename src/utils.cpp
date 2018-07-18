@@ -9,11 +9,10 @@
 #include <ctime>
 #include <cstdlib>
 #include <regex>
-#include <stdexcept>
 
 #define IFERR(x) if ((x) < 0)
 
-inline void ThrowErrno() {
+void ThrowErrno() {
   throw std::system_error(errno, std::generic_category());
 }
 
@@ -57,6 +56,13 @@ std::string ConcatPath(const std::string& path1, const std::string& path2) {
   if (path1.empty() || IsAbsolutePath(path2)) return path2;
   if (path1.back() == '/') return path1 + path2;
   return path1 + '/' + path2;
+}
+
+std::string GetFilename(const std::string& path) {
+  std::smatch mt;
+  // this will always match
+  std::regex_search(path, mt, std::regex("(^|/)([^/]*)$"));
+  return mt[2];
 }
 
 std::string RealPath(const std::string& path) {

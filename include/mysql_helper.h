@@ -14,9 +14,6 @@
 class MySQLSession {
   mysqlx::Session* sess_;
   void CheckNull_() const;
-
-  // C++-style sprintf
-  template <class... T> std::string Format_(const std::string&, T...);
 public:
   MySQLSession();
   MySQLSession(const MySQLSession&) = delete;
@@ -37,21 +34,6 @@ public:
   mysqlx::SqlStatement sql(const std::string&);
 };
 
-template <class T> T _Convert(const T& obj) { return obj; }
-// inline is necessary
-inline const char* _Convert(const std::string& obj) { return obj.c_str(); }
-
-template <class... T>
-std::string MySQLSession::Format_(const std::string& str, T... args) {
-  char* strp;
-  if (asprintf(&strp, str.c_str(), _Convert(args)...) == -1) {
-    throw std::runtime_error("asprintf failed");
-  }
-  std::string res(strp);
-  free(strp);
-  return res;
-}
-
 template <class... T>
 void MySQLSession::Start(T... args) {
   if (sess_) delete sess_;
@@ -61,8 +43,8 @@ void MySQLSession::Start(T... args) {
 template <class... T>
 mysqlx::SqlStatement MySQLSession::sql(const std::string& query, T... args) {
   CheckNull_();
-  _DEBUG2("query", Format_(query, args...));
-  return sess_->sql(Format_(query, args...));
+  _DEBUG2("query", FormatStr(query, args...));
+  return sess_->sql(FormatStr(query, args...));
 }
 
 // Schema of a MySQL table

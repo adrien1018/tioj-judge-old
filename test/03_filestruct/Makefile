@@ -1,10 +1,10 @@
 CXX = g++
-CXXFLAGS = -Wall -g# -DOUTPUT_QUERY
+CXXFLAGS = -Wall -O3
 CXXLIBS = -lmysqlcppconn8 -lgtest_main -lgtest -lpthread
 HEADERDIR = ../../include/
 SRCDIR = ../../src/
 
-OBJ = database.o settings.o mysql_helper.o utils.o
+OBJ = filestruct.o settings.o utils.o
 
 TARGET = main
 

@@ -5,6 +5,7 @@
 
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 #ifdef DEBUG
 #include <iostream>
@@ -15,6 +16,9 @@
 #define _DEBUG2(x, y)
 #endif
 
+// throw an exception indicated by errno
+void ThrowErrno();
+
 // File type checking
 bool FileExists(const std::string&);     // follows symlink
 bool IsDirectory(const std::string&);    // does not follow symlink
@@ -23,14 +27,32 @@ bool IsRegularFile(const std::string&);  // does not follow symlink
 // Path checking & manipulating
 bool IsValidFilename(const std::string&);
 bool IsAbsolutePath(const std::string&);
-// Contains no ..
+// contains no ..
 bool IsDownwardPath(const std::string&);
-// Concat 2 paths; if path2 is absolute, path1 is ignored
+// concat 2 paths; if path2 is absolute, path1 is ignored
 std::string ConcatPath(const std::string&, const std::string&);
+// remove path components
+std::string GetFilename(const std::string&);
 
 // File structure maintainance
 std::string RealPath(const std::string&);
 void RemoveRecursive(const std::string&);
+
+// C++-style printf-like string format
+template <class T> T _Convert(const T& obj) { return obj; }
+// inline is necessary
+inline const char* _Convert(const std::string& obj) { return obj.c_str(); }
+
+template <class... T>
+std::string FormatStr(const std::string& str, T... args) {
+  char* strp;
+  if (asprintf(&strp, str.c_str(), _Convert(args)...) == -1) {
+    throw std::runtime_error("asprintf failed");
+  }
+  std::string res(strp);
+  free(strp);
+  return res;
+}
 
 // Basic rule for MySQL database, table and column name
 bool IsValidDBName(const std::string&);

@@ -106,6 +106,8 @@ TEST(DownwardPathTest, Main) {
   EXPECT_TRUE(IsDownwardPath("/usr/lib/libsvm.so"));
   EXPECT_TRUE(IsDownwardPath("usr/lib/libsvm.so"));
   EXPECT_TRUE(IsDownwardPath("usr/lib/"));
+  EXPECT_TRUE(IsDownwardPath("usr/lib.././l.."));
+  EXPECT_TRUE(IsDownwardPath("..usr/..lib/./."));
   EXPECT_TRUE(IsDownwardPath("usr/lib/./."));
   EXPECT_TRUE(IsDownwardPath("/./usr/lib/./."));
   EXPECT_FALSE(IsDownwardPath("/./usr/lib/./.."));
@@ -133,6 +135,12 @@ TEST(ConcatPathTest, Main) {
   EXPECT_EQ("/1/2/3/4", ConcatPath("/1/2", "3/4"));
   EXPECT_EQ("/test/testp", ConcatPath("/test/", "testp"));
   EXPECT_EQ("/test/testp/", ConcatPath("/test/", "testp/"));
+}
+
+TEST(GetFilenameTest, Main) {
+  EXPECT_EQ("1", GetFilename("1"));
+  EXPECT_EQ("", GetFilename("/"));
+  EXPECT_EQ("d", GetFilename("/a/b/c/d"));
 }
 
 TEST(RealPathTest, Main) {
@@ -166,6 +174,13 @@ TEST(RemoveRecursiveTest, Main) {
   EXPECT_NO_THROW(RemoveRecursive("test1/2/2"));
   EXPECT_NO_THROW(RemoveRecursive("test1"));
   EXPECT_NO_THROW(RemoveRecursive("test_rm"));
+  EXPECT_FALSE(FileExists("test1"));
+  EXPECT_FALSE(FileExists("test_rm"));
+  EXPECT_THROW(RemoveRecursive("test_rm"), std::system_error);
+}
+
+TEST(FormatStrTest, Main) {
+  EXPECT_EQ("000123    12", FormatStr("%06d%5s%s", 123, std::string("1"), "2"));
 }
 
 TEST(ValidDBNameTest, Length) {
