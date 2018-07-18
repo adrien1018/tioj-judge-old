@@ -34,7 +34,8 @@ struct JudgeLanguage {
     kDefLangPython2 = 8,
     kDefLangPython3 = 9,
     kDefLangHaskell = 10,
-    kCustomLang     = 255,
+    kDefGenTestdata = 254,
+    kCustomLang     = 255
   } lang;
   int custom_lang_id;
   JudgeLanguage() : lang(kDefLangCpp11), custom_lang_id(0) {}

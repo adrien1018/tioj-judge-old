@@ -188,6 +188,7 @@ struct ProblemSettings {
 
   // used by 1-stage mode only; if true, kill old execution when new
   //  judge request of the same problem arrived
+  //  (which means problem is the judging unit, not submission)
   bool kill_old;
 
   // fully-customized stage

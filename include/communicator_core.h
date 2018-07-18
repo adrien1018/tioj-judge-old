@@ -1,35 +1,65 @@
 #ifndef COMMUNICATOR_CORE_H_
 #define COMMUNICATOR_CORE_H_
 
-/// This header defines functions to communicate with web server and scheduler.
+/// This header defines functions to communicate with web server and scheduler
+///  and necessary locks / structures maintaining communicator status,
 /// All functions are thread-safe.
 
-// ----- Web server -----
+struct ServerMessage {
+  enum Type {
+    kJudgeRequest = 1,
+    // Testdata generation is the same as judge request, except that
+    //  it needs to acquire per-problem lock
+    kGenTestdata = 2,
+    kKillRequest = 3,
+    kDeleteRequest = 4
+  } type;
+  int problem_id;
+  int submission_id;
+  // QUESTION: Is this necessary?
+  bool judge_by_problem;
+};
 
-/// Query judge / kill / rejudge requests
-bool QueryRequest(const /*Request type*/& req);
+struct GraderMessage {
+  enum Type {
+    kTestdataResult = 1,
+    kSubmissionResult = 2,
+    kFinished = 3
+  };
+  int submission_id;
+  int testdata_id;
+};
 
-/// Fetch submission after a timestamp
-void FetchProblemSubmissions(int prod_id, /*time+id*/ timestamp);
+/// Initialize (called when communicator starts)
+void InitCore();
 
-/// Check testdata consistency + fetch testdata of a problem
-void FetchTestdata(int prob_id);
+/// Query judge / kill / testdata generation requests (synchronous)
+/// If fd >= 0, this function will return false when read to fd will not block.
+bool GetServerMsg(ServerMessage&, int fd = -1);
 
-/// Check problem settings consistency + fetch
-void FetchProblemSpec(int prob_id);
+/// Get a message from grader (synchronous)
+bool GetGraderMsg(GraderMessage&, int fd = -1);
 
-/// Send judge results or confirmation
-void SendMsg(const /*Message type*/& result);
+/// Send a message to web server (asynchronous)
+void SendMsg(GraderMessage&);
 
-// ----- Scheduler -----
+/// Update problem settings & testdata & submissions (synchronous)
+void FetchProblem(int);
 
-/// Make a kill request
-void RequestKill(int submission_id);
+/// Request scheduler to kill a submission (asynchronous)
+void RequestKill(int);
 
-/// Make a judge request
-void RequestJudge(int submission_id);
+/// Request scheduler to judge a submission (asynchronous)
+/// judge_by_problem is represented as negative submission id, where
+///  problem_id = -submission_id
+void RequestJudge(int);
 
-/// Wait for messages for timeval ms
-int GetMsg(/*Message type*/& result, long& timeval);
+/// Problem / submission lock maintenance
+/// Note that problem locks and submission locks are independent;
+///  it is necessary to check whenever updating a submission.
+void LockProblem(int id);
+void LockSubmission(int id);
+void UnlockProblem(int id);
+void UnlockSubmission(int id);
 
 #endif

@@ -150,11 +150,17 @@ long long GetProblemTimestamp(MySQLSession& sess, int id) {
   if (res.count() == 0) {
     throw std::invalid_argument("Problem not exist");
   }
-  if (res.count() > 1) {
-    std::cerr << "Duplicate problem entry?\n";
-    exit(1);
-  }
   return static_cast<int64_t>(res.fetchOne()[0]);
+}
+
+bool IsJudgeByProblem(MySQLSession& sess, int id) {
+  auto res = sess.sql("SELECT is_one_stage, kill_old FROM problem_settings "
+                      "WHERE problem_id = ?;").bind(id).execute();
+  if (res.count() == 0) {
+    throw std::invalid_argument("Problem not exist");
+  }
+  auto row = res.fetchOne();
+  return static_cast<bool>(row[0]) && static_cast<bool>(row[1]);
 }
 
 struct AttrEntry {

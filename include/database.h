@@ -12,6 +12,9 @@ void InitMySQLSession(MySQLSession&, bool check = true);
 // Get timestamp of a problem; if not exist, throw invalid_argument
 long long GetProblemTimestamp(MySQLSession&, int);
 
+// Check if a problem is 1-stage and kill_old
+bool IsJudgeByProblem(MySQLSession&, int);
+
 // QUESTION: Is this necessary?
 // Check if settings is valid
 // bool IsValidProblemSettings(const ProblemSettings&);

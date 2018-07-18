@@ -303,7 +303,6 @@ TEST_F(ProbSettingsRWTest, CustomStage) {
 }
 
 TEST(GetProblemTimestampTest, Main) {
-  // now problem_settings are empty
   EXPECT_THROW(GetProblemTimestamp(sess, 1001), std::invalid_argument);
   ProblemSettings prob;
   prob.problem_id = 1001;
@@ -314,6 +313,24 @@ TEST(GetProblemTimestampTest, Main) {
   UpdateProblemSettings(sess, prob);
   EXPECT_EQ(63191117070, GetProblemTimestamp(sess, 1001));
   EXPECT_EQ(63076601597, GetProblemTimestamp(sess, 1002));
+  sess.sql("DELETE FROM problem_settings;").execute();
+}
+
+TEST(JudgeByProblemTest, Main) {
+  EXPECT_THROW(IsJudgeByProblem(sess, 1001), std::invalid_argument);
+  ProblemSettings prob;
+  prob.problem_id = 1001;
+  prob.is_one_stage = true;
+  UpdateProblemSettings(sess, prob);
+  prob.problem_id = 1002;
+  prob.kill_old = true;
+  UpdateProblemSettings(sess, prob);
+  EXPECT_FALSE(IsJudgeByProblem(sess, 1001));
+  EXPECT_TRUE(IsJudgeByProblem(sess, 1002));
+  prob.is_one_stage = false;
+  UpdateProblemSettings(sess, prob);
+  EXPECT_FALSE(IsJudgeByProblem(sess, 1002));
+  sess.sql("DELETE FROM problem_extra_attr;").execute();
   sess.sql("DELETE FROM problem_settings;").execute();
 }
 
