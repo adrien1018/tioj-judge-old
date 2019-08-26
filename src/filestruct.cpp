@@ -11,64 +11,73 @@
 
 #define IFERR_THROW(x) if ((x) < 0) ThrowErrno()
 
-// declare extern for testing program to link
-extern const std::string kProblemBaseDir;
-extern const std::string kCommonFilesDir;
-extern const std::string kTestdataDir;
-extern const std::string kProblemFilesDir;
-extern const std::string kSubmissionsDir;
-extern const std::string kStatusFilePath;
+namespace fs = std::filesystem;
 
-const std::string kProblemBaseDir = ConcatPath(kDataPath, "problem");
-const std::string kCommonFilesDir = "commonfiles";
-const std::string kTestdataDir = "testdata";
-const std::string kProblemFilesDir = ".problemfiles";
-const std::string kSubmissionsDir = "submissions";
-const std::string kStatusFilePath = "status";
+// declare extern for testing program to link
+extern const fs::path kProblemBaseDir;
+extern const fs::path kCommonFilesDir;
+extern const fs::path kTestdataDir;
+extern const fs::path kProblemFilesDir;
+extern const fs::path kSubmissionsDir;
+
+const fs::path kProblemBaseDir = kDataPath/"problem";
+const fs::path kCommonFilesDir = "commonfiles";
+const fs::path kTestdataDir = "testdata";
+const fs::path kProblemFilesDir = "problemfiles";
+const fs::path kSubmissionsDir = "submissions";
 
 inline std::string ProbDirName(int id) {
-  return FormatStr("%05d", id);
+  return FormatStr("%06d", id);
 }
 
-std::string FSProblemDir(int id) {
-  return ConcatPath(kProblemBaseDir, ProbDirName(id));
+fs::path FSProblemDir(int id) {
+  return kProblemBaseDir/ProbDirName(id);
 }
-std::string FSProblemTarPath(int id) {
-  return FSProblemDir(id) + ".tar.gz";
+fs::path FSSubmissionDir(int prob_id, int sub_id) {
+  return FSProblemDir(prob_id)/kSubmissionsDir/FormatStr("%08d", sub_id);
 }
-std::string FSTestdataFilePath(int prob_id, int testdata_id, int file_id) {
-  return ConcatPath(ConcatPath(FSProblemDir(prob_id), kTestdataDir),
-                    FormatStr("%04d_%02d", testdata_id, file_id));
+fs::path FSSubmissionFilePath(int prob_id, int sub_id, int file_id) {
+  return FSSubmissionDir(prob_id, sub_id)/FormatStr("%d", file_id);
+};
+fs::path FSProblemTarPath(int id) {
+  fs::path ret = FSProblemDir(id);
+  ret += ".tar.gz";
+  return ret;
 }
-std::string FSProblemFilePath(int prob_id, int file_id) {
-  return ConcatPath(ConcatPath(FSProblemDir(prob_id), kProblemFilesDir),
-                    FormatStr("%05d", file_id));
+fs::path FSTestdataFilePath(int prob_id, int testdata_id, int file_id) {
+  return FSProblemDir(prob_id)/kTestdataDir/
+      FormatStr("%04d_%02d", testdata_id, file_id);
 }
-std::string FSCommonFilePath(int prob_id, int file_id) {
-  return ConcatPath(ConcatPath(FSProblemDir(prob_id), kCommonFilesDir),
-                    FormatStr("%03d", file_id));
+fs::path FSProblemFilePath(int prob_id, int file_id) {
+  return FSProblemDir(prob_id)/kProblemFilesDir/FormatStr("%04d", file_id);
+}
+fs::path FSCommonFilePath(int prob_id, int file_id) {
+  return FSProblemDir(prob_id)/kCommonFilesDir/FormatStr("%03d", file_id);
 }
 
 void CreateProblemDir(int id) {
-  const std::string base = FSProblemDir(id) + "/";
-  IFERR_THROW(mkdir(base.c_str(), 0755));
-  IFERR_THROW(mkdir((base + kProblemFilesDir).c_str(), 0755));
-  IFERR_THROW(mkdir((base + kSubmissionsDir).c_str(), 0755));
-  IFERR_THROW(mkdir((base + kTestdataDir).c_str(), 0755));
-  IFERR_THROW(mkdir((base + kCommonFilesDir).c_str(), 0755));
-  IFERR_THROW(creat((base + kStatusFilePath).c_str(), 0644));
+  const fs::path base = FSProblemDir(id);
+  fs::create_directory(base);
+  fs::create_directory(base/kProblemFilesDir);
+  fs::create_directory(base/kSubmissionsDir);
+  fs::create_directory(base/kTestdataDir);
+  fs::create_directory(base/kCommonFilesDir);
+}
+
+void CreateSubmissionDir(int problem_id, int submission_id) {
+  fs::create_directory(FSSubmissionDir(problem_id, submission_id));
 }
 
 bool CheckProblemCompressed(int id) {
-  return !FileExists(FSProblemDir(id));
+  return !fs::exists(FSProblemDir(id)) && fs::exists(FSProblemTarPath(id));
 }
 
 void CompressProblemDir(int id, volatile std::atomic_bool& interrupt) {
-  const std::string base = FSProblemDir(id);
-  if (!FileExists(base)) {
+  const fs::path base = FSProblemDir(id);
+  if (!fs::exists(base)) {
     throw std::invalid_argument("Problem dir does not exist");
   }
-  const std::string tarpath = FSProblemTarPath(id);
+  const fs::path tarpath = FSProblemTarPath(id);
   pid_t pid = fork();
   IFERR_THROW(pid);
   if (pid == 0) {
@@ -96,17 +105,17 @@ void CompressProblemDir(int id, volatile std::atomic_bool& interrupt) {
   }
   if (!WIFEXITED(status) || WEXITSTATUS(status) != 0 || intr_flag) {
     // interrupted / not exited normally
-    unlink(tarpath.c_str());
+    fs::remove(tarpath);
     if (!intr_flag) throw std::runtime_error("tar exited with nonzero status");
   } else {
     // successfully compressed and not interrupted, remove base dir
-    RemoveRecursive(base);
+    fs::remove_all(base);
   }
 }
 
 void DecompressProblemDir(int id) {
-  std::string tarpath = FSProblemTarPath(id);
-  if (!FileExists(tarpath)) {
+  const fs::path tarpath = FSProblemTarPath(id);
+  if (!fs::exists(tarpath)) {
     throw std::invalid_argument("Problem tarball does not exist");
   }
   pid_t pid = fork();
@@ -123,31 +132,39 @@ void DecompressProblemDir(int id) {
   if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
     throw std::runtime_error("Problem dir decompression failed");
   } else {
-    unlink(tarpath.c_str());
+    fs::remove(tarpath);
   }
 }
 
 void UpdateFileLinks(const ProblemSettings& ps) {
-  auto Link = [](const std::string& a, const std::string& b) {
-    IFERR_THROW(link(a.c_str(), b.c_str()));
-  };
-
-  const std::string testdatadir = ConcatPath(
-      FSProblemDir(ps.problem_id), kTestdataDir);
-  const std::string commonfilesdir = ConcatPath(
-      FSProblemDir(ps.problem_id), kCommonFilesDir);
-  RemoveRecursive(testdatadir);
-  RemoveRecursive(commonfilesdir);
-  IFERR_THROW(mkdir(testdatadir.c_str(), 0755));
-  IFERR_THROW(mkdir(commonfilesdir.c_str(), 0755));
+  const fs::path testdatadir = FSProblemDir(ps.problem_id)/kTestdataDir;
+  const fs::path commonfilesdir = FSProblemDir(ps.problem_id)/kCommonFilesDir;
+  fs::remove_all(testdatadir);
+  fs::remove_all(commonfilesdir);
+  fs::create_directory(testdatadir);
+  fs::create_directory(commonfilesdir);
   for (size_t i = 0; i < ps.common_files.size(); i++) {
-    Link(FSProblemFilePath(ps.problem_id, ps.common_files[i].file_id),
-         FSCommonFilePath(ps.problem_id, i));
+    fs::create_hard_link(
+        FSProblemFilePath(ps.problem_id, ps.common_files[i].file_id),
+        FSCommonFilePath(ps.problem_id, i));
   }
   for (size_t i = 0; i < ps.testdata.size(); i++) {
     for (size_t j = 0; j < ps.testdata[i].file_id.size(); j++) {
-      Link(FSProblemFilePath(ps.problem_id, ps.testdata[i].file_id[j]),
-           FSTestdataFilePath(ps.problem_id, i, j));
+      fs::create_hard_link(
+          FSProblemFilePath(ps.problem_id, ps.testdata[i].file_id[j]),
+          FSTestdataFilePath(ps.problem_id, i, j));
     }
   }
+}
+
+void DeleteProblemFiles(int problem_id) {
+  if (CheckProblemCompressed(problem_id)) {
+    fs::remove_all(FSProblemTarPath(problem_id));
+  } else {
+    fs::remove_all(FSProblemDir(problem_id));
+  }
+}
+
+void DeleteSubmissionFiles(int problem_id, int submission_id) {
+  fs::remove_all(FSSubmissionDir(problem_id, submission_id));
 }

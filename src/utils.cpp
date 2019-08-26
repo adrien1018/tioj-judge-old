@@ -1,11 +1,5 @@
 #include "utils.h"
 
-#include <ftw.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <ctime>
 #include <cstdlib>
 #include <regex>
@@ -16,72 +10,24 @@ void ThrowErrno() {
   throw std::system_error(errno, std::generic_category());
 }
 
-bool FileExists(const std::string& path) {
-  IFERR(access(path.c_str(), F_OK)) {
-    if (errno == EACCES || errno == ELOOP || errno == ENAMETOOLONG ||
-        errno == ENOENT) return false;
-    ThrowErrno();
-  }
-  return true;
-}
-
-bool IsDirectory(const std::string& path) {
-  struct stat path_stat;
-  IFERR(lstat(path.c_str(), &path_stat)) ThrowErrno();
-  return S_ISDIR(path_stat.st_mode);
-}
-
-bool IsRegularFile(const std::string& path) {
-  struct stat path_stat;
-  IFERR(lstat(path.c_str(), &path_stat)) ThrowErrno();
-  return S_ISREG(path_stat.st_mode);
-}
-
 // ext2/3/4
 bool IsValidFilename(const std::string& str) {
   if (str.size() < 1 || str.size() > 255) return false;
   return !std::regex_search(str, std::regex("[\\0/]"));
 }
 
-bool IsAbsolutePath(const std::string& path) {
-  return path.size() && path[0] == '/';
-}
-
-bool IsDownwardPath(const std::string& path) {
-  return !std::regex_search(path, std::regex("(^|/)\\.\\.(/|$)"));
+bool IsDownwardPath(const std::filesystem::path& path) {
+  for (auto& i : path) {
+    if (i == "..") return false;
+  }
+  return true;
 }
 
 std::string ConcatPath(const std::string& path1, const std::string& path2) {
   if (path2.empty()) return path1;
-  if (path1.empty() || IsAbsolutePath(path2)) return path2;
+  if (path1.empty() || path2[0] == '/') return path2;
   if (path1.back() == '/') return path1 + path2;
   return path1 + '/' + path2;
-}
-
-std::string GetFilename(const std::string& path) {
-  std::smatch mt;
-  // this will always match
-  std::regex_search(path, mt, std::regex("(^|/)([^/]*)$"));
-  return mt[2];
-}
-
-std::string RealPath(const std::string& path) {
-  char* ptr = realpath(path.c_str(), nullptr);
-  if (!ptr) ThrowErrno();
-  std::string ret(ptr);
-  free(ptr);
-  return ret;
-}
-
-int UnlinkHelper(const char* fpath, const struct stat* sb, int typeflag,
-                 struct FTW *ftwbuf) {
-  return remove(fpath);
-}
-
-void RemoveRecursive(const std::string& path) {
-  IFERR(nftw(path.c_str(), UnlinkHelper, 128, FTW_DEPTH | FTW_PHYS)) {
-    ThrowErrno();
-  }
 }
 
 // length <= 64 and only alphanumeric and '_'; not start with number

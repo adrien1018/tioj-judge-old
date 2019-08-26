@@ -11,27 +11,17 @@
 #include "filestruct.h"
 #include "utils.h"
 
-const std::string kDataPath = ".";
+namespace fs = std::filesystem;
+
+const fs::path kDataPath = ".";
 
 void CreateRandomFile(const std::string& str) {
   static std::mt19937_64 gen;
   std::fstream fout(str, std::ios::out);
-  for (int i = 0; i < 1000000; i++) {
+  for (int i = 0; i < 500000; i++) {
     fout << std::string(std::uniform_int_distribution<int>(1, 11)(gen),
         std::uniform_int_distribution<char>(32, 125)(gen));
   }
-}
-
-int GetLinkNum(const std::string& str) {
-  struct stat stats;
-  if (stat(str.c_str(), &stats) < 0) ThrowErrno();
-  return stats.st_nlink;
-}
-
-long long GetFileLength(const std::string& str) {
-  struct stat stats;
-  if (stat(str.c_str(), &stats) < 0) ThrowErrno();
-  return stats.st_size;
 }
 
 extern const std::string kProblemBaseDir;
@@ -39,7 +29,6 @@ extern const std::string kCommonFilesDir;
 extern const std::string kTestdataDir;
 extern const std::string kProblemFilesDir;
 extern const std::string kSubmissionsDir;
-extern const std::string kStatusFilePath;
 
 namespace {
 
@@ -49,19 +38,41 @@ class Environment : public ::testing::Environment {
     mkdir(kProblemBaseDir.c_str(), 0755);
   }
   virtual void TearDown() {
-    RemoveRecursive(kProblemBaseDir);
+    fs::remove_all(kProblemBaseDir);
   }
 };
 
-TEST(CreateProblemDirTest, Main) {
+TEST(PathTest, Main) {
+  EXPECT_EQ(fs::relative(FSProblemDir(23)), "problem/000023");
+  EXPECT_EQ(fs::relative(FSSubmissionDir(23, 34)), "problem/000023/submissions/00000034");
+  EXPECT_EQ(fs::relative(FSSubmissionFilePath(23, 34, 45)), "problem/000023/submissions/00000034/45");
+  EXPECT_EQ(fs::relative(FSProblemTarPath(23)), "problem/000023.tar.gz");
+  EXPECT_EQ(fs::relative(FSTestdataFilePath(23, 34, 1)), "problem/000023/testdata/0034_01");
+  EXPECT_EQ(fs::relative(FSProblemFilePath(23, 2)), "problem/000023/problemfiles/0002");
+  EXPECT_EQ(fs::relative(FSCommonFilePath(23, 2)), "problem/000023/commonfiles/002");
+}
+
+TEST(ProblemDirTest, Main) {
   CreateProblemDir(1);
-  EXPECT_TRUE(IsDirectory(FSProblemDir(1)));
-  EXPECT_TRUE(IsDirectory(ConcatPath(FSProblemDir(1), kProblemFilesDir)));
-  EXPECT_TRUE(IsDirectory(ConcatPath(FSProblemDir(1), kTestdataDir)));
-  EXPECT_TRUE(IsDirectory(ConcatPath(FSProblemDir(1), kCommonFilesDir)));
-  EXPECT_TRUE(IsDirectory(ConcatPath(FSProblemDir(1), kSubmissionsDir)));
-  EXPECT_TRUE(IsRegularFile(ConcatPath(FSProblemDir(1), kStatusFilePath)));
-  RemoveRecursive(FSProblemDir(1));
+  EXPECT_TRUE(fs::is_directory(FSProblemDir(1)));
+  EXPECT_TRUE(fs::is_directory(FSProblemDir(1)/kProblemFilesDir));
+  EXPECT_TRUE(fs::is_directory(FSProblemDir(1)/kTestdataDir));
+  EXPECT_TRUE(fs::is_directory(FSProblemDir(1)/kCommonFilesDir));
+  EXPECT_TRUE(fs::is_directory(FSProblemDir(1)/kSubmissionsDir));
+  CreateSubmissionDir(1, 10);
+  EXPECT_TRUE(fs::is_directory(FSSubmissionDir(1, 10)));
+  DeleteProblemFiles(1);
+  EXPECT_FALSE(fs::exists(FSProblemDir(1)));
+}
+
+TEST(ProblemDirTest, DeleteCompress) {
+  std::atomic_bool intr(false);
+  CreateProblemDir(1);
+  CompressProblemDir(1, intr);
+  DeleteProblemFiles(1);
+  EXPECT_FALSE(fs::exists(FSProblemDir(1)));
+  EXPECT_FALSE(fs::exists(FSProblemTarPath(1)));
+  EXPECT_FALSE(CheckProblemCompressed(1));
 }
 
 class ProblemFileStructTest : public ::testing::Test {
@@ -69,24 +80,28 @@ class ProblemFileStructTest : public ::testing::Test {
   virtual void SetUp() {
     CreateProblemDir(1);
     for (int i = 0; i < 20; i++) CreateRandomFile(FSProblemFilePath(1, i));
+    CreateSubmissionDir(1, 10);
+    CreateSubmissionDir(1, 11);
+    for (int i = 0; i < 3; i++) CreateRandomFile(FSSubmissionFilePath(1, 10, i));
+    for (int i = 0; i < 3; i++) CreateRandomFile(FSSubmissionFilePath(1, 11, i));
   }
   virtual void TearDown() {
-    RemoveRecursive(FSProblemDir(1));
+    DeleteProblemFiles(1);
   }
 };
 
 TEST_F(ProblemFileStructTest, CompressAndDecompress) {
   std::atomic_bool intr(false);
   CompressProblemDir(1, intr);
-  EXPECT_TRUE(IsRegularFile(FSProblemTarPath(1)));
-  EXPECT_FALSE(FileExists(FSProblemDir(1)));
+  EXPECT_TRUE(fs::is_regular_file(FSProblemTarPath(1)));
+  EXPECT_FALSE(fs::exists(FSProblemDir(1)));
   EXPECT_TRUE(CheckProblemCompressed(1));
-  std::cerr << "filesize = " << GetFileLength(FSProblemTarPath(1)) << '\n';
+  std::cerr << "filesize = " << fs::file_size(FSProblemTarPath(1)) << '\n';
   DecompressProblemDir(1);
-  EXPECT_TRUE(IsRegularFile(FSProblemFilePath(1, 14)));
-  EXPECT_TRUE(IsRegularFile(FSProblemFilePath(1, 0)));
-  EXPECT_FALSE(FileExists(FSProblemTarPath(1)));
-  EXPECT_TRUE(IsDirectory(FSProblemDir(1)));
+  EXPECT_TRUE(fs::is_regular_file(FSProblemFilePath(1, 14)));
+  EXPECT_TRUE(fs::is_regular_file(FSProblemFilePath(1, 0)));
+  EXPECT_FALSE(fs::exists(FSProblemTarPath(1)));
+  EXPECT_TRUE(fs::is_directory(FSProblemDir(1)));
   EXPECT_FALSE(CheckProblemCompressed(1));
 }
 
@@ -98,15 +113,15 @@ void IntrThread(std::atomic_bool* s) {
 TEST_F(ProblemFileStructTest, CompressInterrupt) {
   std::atomic_bool* intr = new std::atomic_bool(true);
   CompressProblemDir(1, *intr);
-  EXPECT_FALSE(FileExists(FSProblemTarPath(1)));
-  EXPECT_TRUE(IsDirectory(FSProblemDir(1)));
+  EXPECT_FALSE(fs::exists(FSProblemTarPath(1)));
+  EXPECT_TRUE(fs::is_directory(FSProblemDir(1)));
   EXPECT_FALSE(CheckProblemCompressed(1));
   *intr = false;
   std::thread thr(IntrThread, intr);
   CompressProblemDir(1, *intr);
   thr.join();
-  EXPECT_FALSE(FileExists(FSProblemTarPath(1)));
-  EXPECT_TRUE(IsDirectory(FSProblemDir(1)));
+  EXPECT_FALSE(fs::exists(FSProblemTarPath(1)));
+  EXPECT_TRUE(fs::is_directory(FSProblemDir(1)));
   EXPECT_FALSE(CheckProblemCompressed(1));
   delete intr;
 }
@@ -151,25 +166,33 @@ TEST_F(ProblemFileStructTest, FileLink) {
   int ms = duration_cast<duration<double>>(high_resolution_clock::now() - t1).count() * 1000;
   std::cerr << "time = " << ms << " ms\n";
 
-  EXPECT_EQ(3, GetLinkNum(FSTestdataFilePath(1, 5, 0)));
-  EXPECT_EQ(3, GetLinkNum(FSTestdataFilePath(1, 2, 0)));
-  EXPECT_EQ(2, GetLinkNum(FSTestdataFilePath(1, 3, 1)));
-  EXPECT_EQ(3, GetLinkNum(FSProblemFilePath(1, 3)));
-  EXPECT_EQ(2, GetLinkNum(FSProblemFilePath(1, 13)));
-  EXPECT_EQ(2, GetLinkNum(FSCommonFilePath(1, 0)));
-  EXPECT_EQ(2, GetLinkNum(FSCommonFilePath(1, 3)));
-  EXPECT_FALSE(FileExists(FSTestdataFilePath(1, 7, 0)));
-  EXPECT_FALSE(FileExists(FSTestdataFilePath(1, 0, 3)));
-  EXPECT_FALSE(FileExists(FSCommonFilePath(1, 4)));
+  EXPECT_EQ(3, fs::hard_link_count(FSTestdataFilePath(1, 5, 0)));
+  EXPECT_EQ(3, fs::hard_link_count(FSTestdataFilePath(1, 2, 0)));
+  EXPECT_EQ(2, fs::hard_link_count(FSTestdataFilePath(1, 3, 1)));
+  EXPECT_EQ(3, fs::hard_link_count(FSProblemFilePath(1, 3)));
+  EXPECT_EQ(2, fs::hard_link_count(FSProblemFilePath(1, 13)));
+  EXPECT_EQ(2, fs::hard_link_count(FSCommonFilePath(1, 0)));
+  EXPECT_EQ(2, fs::hard_link_count(FSCommonFilePath(1, 3)));
+  EXPECT_FALSE(fs::exists(FSTestdataFilePath(1, 7, 0)));
+  EXPECT_FALSE(fs::exists(FSTestdataFilePath(1, 0, 3)));
+  EXPECT_FALSE(fs::exists(FSCommonFilePath(1, 4)));
 
   std::atomic_bool intr(false);
   CompressProblemDir(1, intr);
-  std::cerr << "filesize = " << GetFileLength(FSProblemTarPath(1)) << '\n';
+  std::cerr << "filesize = " << fs::file_size(FSProblemTarPath(1)) << '\n';
   DecompressProblemDir(1);
 }
 
 TEST_F(ProblemFileStructTest, Empty) {
   EXPECT_TRUE(1);
+}
+
+TEST_F(ProblemFileStructTest, Submission) {
+  EXPECT_TRUE(fs::is_directory(FSSubmissionDir(1, 10)));
+  EXPECT_TRUE(fs::is_directory(FSSubmissionDir(1, 11)));
+  EXPECT_TRUE(fs::is_regular_file(FSSubmissionFilePath(1, 10, 0)));
+  DeleteSubmissionFiles(1, 10);
+  EXPECT_FALSE(fs::exists(FSSubmissionDir(1, 10)));
 }
 
 } // namespace

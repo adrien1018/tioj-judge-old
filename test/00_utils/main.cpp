@@ -37,40 +37,6 @@ class Environment : public ::testing::Environment {
   }
 };
 
-TEST(FileExistsTest, Main) {
-  EXPECT_TRUE(FileExists("test_regular"));
-  EXPECT_TRUE(FileExists("test_directory"));
-  EXPECT_TRUE(FileExists("test_symlink"));
-  EXPECT_TRUE(FileExists("test_fifo"));
-  EXPECT_TRUE(FileExists("test_socket"));
-  EXPECT_TRUE(FileExists("/dev/zero"));
-  EXPECT_FALSE(FileExists("test_dangling_symlink"));
-  EXPECT_FALSE(FileExists("test_notexist"));
-  EXPECT_FALSE(FileExists(""));
-}
-
-TEST(RegularFileTest, Main) {
-  EXPECT_TRUE(IsRegularFile("test_regular"));
-  EXPECT_FALSE(IsRegularFile("test_directory"));
-  EXPECT_FALSE(IsRegularFile("test_symlink"));
-  EXPECT_FALSE(IsRegularFile("test_fifo"));
-  EXPECT_FALSE(IsRegularFile("test_socket"));
-  EXPECT_FALSE(IsRegularFile("/dev/zero"));
-  EXPECT_FALSE(IsRegularFile("test_dangling_symlink"));
-  EXPECT_THROW(IsRegularFile("test_notexist"), std::system_error);
-}
-
-TEST(DirectoryTest, Main) {
-  EXPECT_FALSE(IsDirectory("test_regular"));
-  EXPECT_TRUE(IsDirectory("test_directory"));
-  EXPECT_FALSE(IsDirectory("test_symlink"));
-  EXPECT_FALSE(IsDirectory("test_fifo"));
-  EXPECT_FALSE(IsDirectory("test_socket"));
-  EXPECT_FALSE(IsDirectory("/dev/zero"));
-  EXPECT_FALSE(IsDirectory("test_dangling_symlink"));
-  EXPECT_THROW(IsDirectory("test_notexist"), std::system_error);
-}
-
 TEST(ValidFilenameTest, Length) {
   EXPECT_FALSE(IsValidFilename(""));
   EXPECT_TRUE(IsValidFilename("a"));
@@ -92,14 +58,6 @@ TEST(ValidFilenameTest, Charset) {
   EXPECT_TRUE(IsValidFilename(str));
 }
 
-TEST(AbsolutePathTest, Main) {
-  EXPECT_TRUE(IsAbsolutePath("/bin"));
-  EXPECT_TRUE(IsAbsolutePath("/"));
-  EXPECT_TRUE(IsAbsolutePath("/bin/"));
-  EXPECT_FALSE(IsAbsolutePath("bin/"));
-  EXPECT_FALSE(IsAbsolutePath("bin"));
-}
-
 TEST(DownwardPathTest, Main) {
   EXPECT_TRUE(IsDownwardPath("/usr/lib/"));
   EXPECT_TRUE(IsDownwardPath("/"));
@@ -116,67 +74,6 @@ TEST(DownwardPathTest, Main) {
   EXPECT_FALSE(IsDownwardPath(".."));
   EXPECT_FALSE(IsDownwardPath("../usr/lib/"));
   EXPECT_FALSE(IsDownwardPath("../usr/lib"));
-}
-
-TEST(ConcatPathTest, Empty) {
-  EXPECT_EQ("/test", ConcatPath("/test", ""));
-  EXPECT_EQ("/test", ConcatPath("", "/test"));
-  EXPECT_EQ("test", ConcatPath("", "test"));
-  EXPECT_EQ("test", ConcatPath("test", ""));
-}
-
-TEST(ConcatPathTest, SecondAbsolute) {
-  EXPECT_EQ("/test", ConcatPath("/test/1/2/3/4", "/test"));
-  EXPECT_EQ("/1/2/3/4", ConcatPath("test", "/1/2/3/4"));
-}
-
-TEST(ConcatPathTest, Main) {
-  EXPECT_EQ("/test", ConcatPath("/", "test"));
-  EXPECT_EQ("/1/2/3/4", ConcatPath("/1/2", "3/4"));
-  EXPECT_EQ("/test/testp", ConcatPath("/test/", "testp"));
-  EXPECT_EQ("/test/testp/", ConcatPath("/test/", "testp/"));
-}
-
-TEST(GetFilenameTest, Main) {
-  EXPECT_EQ("1", GetFilename("1"));
-  EXPECT_EQ("", GetFilename("/"));
-  EXPECT_EQ("d", GetFilename("/a/b/c/d"));
-}
-
-TEST(RealPathTest, Main) {
-  char* ptr;
-  ptr = getcwd(nullptr, 0);
-  std::string now(ptr);
-  free(ptr);
-  EXPECT_EQ(ConcatPath(now, "test_regular"), RealPath("test_symlink"));
-  EXPECT_EQ(ConcatPath(now, "test_regular"), RealPath("test_regular"));
-  EXPECT_EQ(ConcatPath(now, "test_fifo"), RealPath("test_fifo"));
-  EXPECT_THROW(RealPath("test_dangling_symlink"), std::system_error);
-  EXPECT_THROW(RealPath("test_notexist"), std::system_error);
-}
-
-TEST(RemoveRecursiveTest, Main) {
-  mkdir("test1", 0755);
-  mkdir("test1/1", 0755);
-  mkdir("test1/2", 0755);
-  mkdir("test1/3", 0755);
-  mkdir("test1/2/1", 0755);
-  mkdir("test1/2/2", 0755);
-  mkdir("test1/2/qwercq qwer", 0755);
-  mkdir("test1/2/werv **ercw.,.", 0755);
-  mkdir("test1/2/werv **ercw.,./wervt", 0755);
-  creat("test1/1.1", 0644);
-  creat("test1/2/1.1", 0644);
-  creat("test1/2/1.2", 0644);
-  creat("test1/2/1.3", 0644);
-  creat("test1/2/1/1.1", 0644);
-  creat("test_rm", 0644);
-  EXPECT_NO_THROW(RemoveRecursive("test1/2/2"));
-  EXPECT_NO_THROW(RemoveRecursive("test1"));
-  EXPECT_NO_THROW(RemoveRecursive("test_rm"));
-  EXPECT_FALSE(FileExists("test1"));
-  EXPECT_FALSE(FileExists("test_rm"));
-  EXPECT_THROW(RemoveRecursive("test_rm"), std::system_error);
 }
 
 TEST(FormatStrTest, Main) {

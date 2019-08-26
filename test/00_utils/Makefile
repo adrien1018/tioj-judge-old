@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall -g
+CXXFLAGS = -Wall -Wno-unused-result -Og -g -std=c++17
 CXXLIBS = -lgtest_main -lgtest -lpthread
 HEADERDIR = ../../include/
 SRCDIR = ../../src/

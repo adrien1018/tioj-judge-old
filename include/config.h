@@ -3,12 +3,13 @@
 
 #include <string>
 #include <vector>
+#include <filesystem>
 
 extern const std::string kMySQLHostname;
 extern const int kMySQLPort;
 extern const std::string kMySQLUsername, kMySQLPassword;
 extern const std::string kDatabaseName;
-extern const std::string kBoxPath, kDataPath;
+extern const std::filesystem::path kBoxPath, kDataPath;
 
 // used in file structures and custom judge options
 enum Language {
