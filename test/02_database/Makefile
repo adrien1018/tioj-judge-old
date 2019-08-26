@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall -g# -DOUTPUT_QUERY
+CXXFLAGS = -Wall -Og -g -std=c++17# -DOUTPUT_QUERY
 CXXLIBS = -lmysqlcppconn8 -lgtest_main -lgtest -lpthread
 HEADERDIR = ../../include/
 SRCDIR = ../../src/

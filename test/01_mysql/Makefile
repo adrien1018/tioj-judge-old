@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall -g
+CXXFLAGS = -Wall -Og -g -std=c++17
 CXXLIBS = -lmysqlcppconn8 -lgtest_main -lgtest -lpthread
 HEADERDIR = ../../include/
 SRCDIR = ../../src/

@@ -126,9 +126,8 @@ struct ProblemSettings {
       kInteger = 2,    // 64-bit signed integer
       kFloat = 3,      // long double
       kShortText = 4,  // text not longer than 64 bytes
-      kText = 5        // long text, must be the last column
-      // kFile = 6     // file
-      // QUESTION: should this exist?
+      kText = 5,       // long text, must be the last column
+      kFile = 6        // file
     } type;
     bool visible; // if true, it will be send to the web server
     ResultColumn();

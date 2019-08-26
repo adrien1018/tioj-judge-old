@@ -159,7 +159,7 @@ TEST_F(DatabaseTableTest, CheckTable) {
   EXPECT_TRUE(schema.IsExist(sess));
   EXPECT_FALSE(schema.CheckTable(sess));
 
-  sess.sql("CREATE INDEX ON test (id,a);", index_name).execute();
+  sess.sql("CREATE INDEX test_id_a ON test (id,a);", index_name).execute();
   EXPECT_TRUE(schema.IsExist(sess));
   EXPECT_TRUE(schema.CheckTable(sess));
 

@@ -3,3 +3,4 @@
  - [ ] Scheduling policy
  - [ ] Revise README
  - [ ] Support of testdata generation & verification
+ - [ ] Change some problem settings into protobuf format

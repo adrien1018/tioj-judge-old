@@ -25,4 +25,6 @@ ProblemSettings GetProblemSettings(MySQLSession&, int);
 // Update settings of a problem
 void UpdateProblemSettings(MySQLSession&, const ProblemSettings&);
 
+// a lot more...
+
 #endif

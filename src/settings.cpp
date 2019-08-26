@@ -82,13 +82,15 @@ ProblemSettings::ProblemSettings() :
     partial_judge(false), // judge whole problem
     evaluation_type(ProblemSettings::kEvalNormal), // normal judge
     evaluation_format(ProblemSettings::kEvalFormatZero), // not used
-    password(0),
+    password(0), // not used
     evaluation_compile(), // not used
     evaluation_columns(), // no additional columns
     evaluate_nonnormal(false),
     scoring_type(ProblemSettings::kScoringNormal), // normal scoring
+    scoring_compile(), // not used
+    scoring_columns(), // no additional columns
     file_per_testdata(2), // no additional files
-    testdata_files(), common_files(),
+    testdata_files(), common_files(), // not used
     kill_old(false), // not used
-    // custom_stage(),
-    timestamp(0) {}
+    custom_stage(), // not used
+    testdata(), ranges(), timestamp(0) {}
